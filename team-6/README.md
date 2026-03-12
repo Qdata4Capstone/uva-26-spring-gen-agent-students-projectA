@@ -115,7 +115,7 @@ This lets you develop and test the GUI without waiting for model servers.
 | MRI/CT | `.dcm` | Single file or multi-file series |
 | MRI/CT | `.png`/`.jpg` | Pre-converted images |
 
-## SLURM Job Script (Set-up on rivanna Rivanna)
+## SLURM Job Script (Set-up on Rivanna)
 
 ```bash
 #!/bin/bash
