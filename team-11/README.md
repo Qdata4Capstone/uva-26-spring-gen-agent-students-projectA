@@ -1,4 +1,5 @@
 # FinSynth — Financial Synthesis AI Agent
+Team 11: Grant Xiao
 
 A multi-agent AI system that analyzes stock financials and news to produce structured investment reports. Built with **LangGraph**, **Model Context Protocol (MCP)**, **FastAPI**, and **Next.js**.
 
@@ -63,9 +64,8 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.template .env
 # Edit .env and add your GEMINI_API_KEY (required)
+GEMINI_API_KEY="insert gemini key"
 # BRAVE_SEARCH_API_KEY is optional (falls back to yfinance news)
 
 # Start the server
@@ -81,9 +81,6 @@ cd frontend
 
 # Install dependencies
 npm install
-
-# Configure environment (optional)
-cp .env.local.template .env.local
 
 # Start dev server
 npm run dev
@@ -106,3 +103,6 @@ The UI will be available at `http://localhost:3000`.
 - **Data**: yfinance (financials), Brave Search (news)
 - **Frontend**: Next.js 16, Tailwind CSS, Shadcn UI, React Markdown
 - **Streaming**: Server-Sent Events (SSE)
+
+
+Video Demo Link: https://youtu.be/W_KK-juW-bU 
