@@ -1,0 +1,132 @@
+{
+  "platforms": {
+    "youtube": {
+      "name": "YouTube",
+      "tos_version": "2024-01",
+      "privacy_requirements": [
+        "Must not upload content that violates individual's privacy",
+        "Faces of private individuals should be blurred if identifiable",
+        "License plates should be blurred for privacy protection",
+        "Content scraped from YouTube must comply with YouTube TOS Section 5B",
+        "No unauthorized use of personal data from videos"
+      ],
+      "de_identification_required": true,
+      "allowed_uses": ["research", "education", "commentary", "criticism"],
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "metadata_strip_required": true,
+      "re_id_threshold": 0.1
+    },
+    "tiktok": {
+      "name": "TikTok",
+      "privacy_requirements": [
+        "Personal data of users must not be collected without consent",
+        "Faces and identifying information must be anonymized for dataset use"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "metadata_strip_required": true,
+      "re_id_threshold": 0.1
+    }
+  },
+  "conferences": {
+    "cvpr2026": {
+      "name": "CVPR 2026",
+      "open_science_policy": "CVPR 2026 Open Science Policy",
+      "year": 2026,
+      "dataset_requirements": [
+        "Datasets must comply with all applicable privacy laws (GDPR, CCPA, etc.)",
+        "Identifiable individuals in datasets must be anonymized or have given explicit consent",
+        "Authors must confirm compliance with data collection platform terms of service",
+        "Privacy-sensitive regions (faces, license plates) must be de-identified",
+        "Dataset paper must include IRB approval or equivalent ethics review",
+        "Must provide documentation of anonymization methodology"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "metadata_strip_required": true,
+      "compliance_report_required": true,
+      "re_id_threshold": 0.1,
+      "ego_centric_detection": true,
+      "notes": "Ego-centric / first-person videos require stricter processing with egoblur tool"
+    },
+    "cvpr2025": {
+      "name": "CVPR 2025",
+      "year": 2025,
+      "dataset_requirements": [
+        "Same privacy requirements as CVPR 2026",
+        "GDPR compliance mandatory for EU-sourced data"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "metadata_strip_required": true,
+      "compliance_report_required": true,
+      "re_id_threshold": 0.1
+    },
+    "iccv2025": {
+      "name": "ICCV 2025",
+      "year": 2025,
+      "dataset_requirements": [
+        "Privacy compliance required for all human subjects",
+        "Data collection must comply with platform terms of service"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "metadata_strip_required": true,
+      "re_id_threshold": 0.1
+    },
+    "neurips2025": {
+      "name": "NeurIPS 2025",
+      "year": 2025,
+      "dataset_requirements": [
+        "Dataset and Benchmark papers require ethics statement",
+        "Human subjects data must be anonymized"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": false,
+      "metadata_strip_required": true,
+      "re_id_threshold": 0.15
+    }
+  },
+  "regulations": {
+    "gdpr": {
+      "name": "GDPR (General Data Protection Regulation)",
+      "jurisdiction": "European Union",
+      "requirements": [
+        "Personal data must not be processed without legal basis",
+        "Biometric data (faces) is 'special category' requiring explicit consent or legal basis",
+        "Right to be forgotten: individuals can request removal of their data",
+        "Data minimization: only collect data necessary for the purpose",
+        "Anonymization must be irreversible to be outside GDPR scope",
+        "Re-identification risk must be negligible"
+      ],
+      "de_identification_required": true,
+      "irreversible_anonymization_required": true,
+      "face_blur_required": true,
+      "license_plate_blur_required": true,
+      "re_id_threshold": 0.05,
+      "notes": "GDPR requires irreversible anonymization. Generative face replacement preferred over simple blur for compliance."
+    },
+    "ccpa": {
+      "name": "CCPA (California Consumer Privacy Act)",
+      "jurisdiction": "California, USA",
+      "requirements": [
+        "Consumers have right to know what personal information is collected",
+        "Consumers can opt-out of sale of personal information",
+        "Biometric information requires explicit notice"
+      ],
+      "de_identification_required": true,
+      "face_blur_required": true,
+      "re_id_threshold": 0.1
+    }
+  },
+  "conflict_resolution": {
+    "priority_order": ["regulations", "platforms", "conferences"],
+    "notes": "When conflicts exist, stricter requirement prevails. GDPR irreversibility > simple blur."
+  }
+}
