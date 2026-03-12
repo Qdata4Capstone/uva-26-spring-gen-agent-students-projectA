@@ -1,0 +1,16 @@
+[project]
+name = "envcheck"
+version = "0.1.0"
+description = "AI-powered pre-flight diagnostic for code environment compatibility — detects API breaking changes, dependency conflicts, and version mismatches before runtime."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.83.0",
+    "google-genai>=1.64.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+]
