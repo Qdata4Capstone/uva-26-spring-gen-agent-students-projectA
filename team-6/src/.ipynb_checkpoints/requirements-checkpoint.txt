@@ -1,0 +1,28 @@
+# CardioAgent Demo — Dependencies
+# Core
+streamlit>=1.30
+openai>=1.0
+
+# ECG Processing
+wfdb>=4.0
+neurokit2>=0.2
+scipy>=1.10
+
+# DICOM Processing
+pydicom>=2.4
+
+# Visualization
+matplotlib>=3.7
+Pillow>=10.0
+numpy>=1.24
+pandas>=2.0
+
+# RAG (optional, for Step 2)
+# chromadb>=0.4
+# sentence-transformers>=2.2
+
+# Model Serving (install on server)
+# vllm>=0.8.0
+
+# MCP SDK (optional, for full MCP protocol)
+# mcp>=0.9
