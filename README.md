@@ -13,8 +13,8 @@
 ### Steps
 ```bash
 # Clone the repository
-git clone https://github.com/bowang-lab/MedRAX.git
-cd MedRAX
+git clone https://github.com/mengmenm/uva-26-spring-gen-agent-students-projectA.git
+cd team-07/src
 
 # Install package
 pip install -e .
