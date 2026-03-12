@@ -129,8 +129,9 @@ This lets you develop and test the GUI without waiting for model servers.
 module load cuda/13.0.2 gcc/11.4.0 anaconda
 conda activate cardioagent
 
-cd /src/cardioagent/code/cardioagent_demo
+cd /your/path/to/the/src
 ./run.sh
 ```
 
 ## Video demo
+https://youtu.be/tu9FSAB928M
