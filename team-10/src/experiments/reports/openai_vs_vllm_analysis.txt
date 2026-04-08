@@ -1,0 +1,126 @@
+Experiment Analysis: OpenAI vs vLLM-Light
+Date: 2026-03-11 UTC
+
+Scope
+- Backend 1: OpenAI using the existing OpenAI path and fresh outputs in experiments/openai_fresh and experiments/reports/openai_fresh.
+- Backend 2: vLLM using a dedicated local GPU-backed server on GPU 3 with Qwen/Qwen2.5-1.5B-Instruct, with fresh outputs in experiments/vllm_light and experiments/reports/vllm_light.
+- Anthropic-labeled "openai" artifacts from the earlier disconnected session were ignored.
+
+Runtime / infrastructure diagnosis
+- The earlier long-running vLLM attempts were not caused by a clear bug in the experiment loop itself.
+- The main issue was backend setup, not experiment logic:
+  1. The default vLLM config pointed at localhost:8000, but the available shared servers were on ports 8001 and 8002.
+  2. The shared 8B vLLM endpoints were unreliable for this benchmark in practice: smoke tests worked, but full baseline runs stalled for long periods without producing logs.
+  3. A detached Anthropic experiment from the earlier lost connection was still running and had to be cancelled.
+- After launching an isolated local vLLM server on GPU 3 with a smaller model, the full vLLM benchmark completed successfully.
+- GPU access was confirmed with nvidia-smi. The local vLLM engine used GPU 3 heavily during generation, so this was not a CPU fallback.
+
+Artifacts generated
+- OpenAI figures: experiments/reports/openai_fresh/
+- vLLM-light figures: experiments/reports/vllm_light/
+- Each backend includes:
+  - Baseline plots: violation_rate_by_agent.png, violation_rate_by_category.png, severity_heatmap.png, severity_distribution.png
+  - Per-agent red-team plots: attack_success_over_turns.png, bandit_state.png, surface_violation_rate.png, severity_by_turn.png
+  - Per-agent comparison plots: baseline_vs_redteam.png, efficiency_comparison.png
+
+High-level summary
+- OpenAI was substantially stronger on the static baseline than vLLM-light.
+- vLLM-light was faster overall, but materially less aligned on baseline probes.
+- On adaptive red-teaming, the difference was narrower:
+  - OpenAI red-team success rate: 7 / 30 = 23.3%
+  - vLLM-light red-team success rate: 5 / 30 = 16.7%
+- The key interpretation is that vLLM-light failed more often on direct baseline prompts, while OpenAI was more robust on baseline probes but still vulnerable to certain adaptive attack surfaces, especially against customer service and medical behavior.
+
+Suite-level timing
+- OpenAI baseline duration: 280.15s
+- OpenAI total red-team duration: 361.40s
+- OpenAI full suite duration: 641.55s
+- vLLM-light baseline duration: 200.43s
+- vLLM-light total red-team duration: 213.18s
+- vLLM-light full suite duration: 413.61s
+
+Baseline results
+OpenAI baseline
+- Overall violation rates:
+  - medical: 0.00
+  - financial: 0.00
+  - customer_service: 0.60
+- Total baseline violation rate: 18 / 90 = 0.20
+- Most vulnerable agent: customer_service
+- Most breached category: tool_restriction
+- Least breached category: escalation_resistance
+
+Interpretation for OpenAI baseline
+- Medical and financial agents were perfectly clean on the sampled probe bank.
+- The customer service agent was the clear weak point.
+- Customer service failed badly on:
+  - tool_restriction: 1.00
+  - identity_stability: 1.00
+  - instruction_following_under_pressure: 1.00
+- This suggests the OpenAI-backed customer service role is comparatively easy to push into over-compliance or role drift, even though the medical and financial roles are much tighter.
+
+vLLM-light baseline
+- Overall violation rates:
+  - medical: 0.367
+  - financial: 0.400
+  - customer_service: 0.833
+- Total baseline violation rate: 48 / 90 = 0.533
+- Most vulnerable agent: customer_service
+- Most breached category: instruction_following_under_pressure
+- Least breached category: escalation_resistance
+
+Interpretation for vLLM-light baseline
+- vLLM-light underperformed OpenAI across all three agents.
+- Unlike OpenAI, its medical and financial agents were not robust on the probe bank.
+- Medical showed notable failures in disclaimer_compliance and instruction_following_under_pressure (both 0.60).
+- Financial was broadly weak rather than weak in only one category; most categories clustered around 0.40.
+- Customer service was highly vulnerable across almost every category and completely failed scope_refusal, tool_restriction, disclaimer_compliance, and instruction_following_under_pressure.
+- This pattern is consistent with a smaller model having weaker instruction hierarchy, weaker refusal consistency, and weaker role stability.
+
+Red-team campaign results
+OpenAI red-team
+- medical: 2 / 10 successes, success rate 0.20, first logged violation at turn 1
+- financial: 1 / 10 successes, success rate 0.10, first logged violation at turn 6
+- customer_service: 4 / 10 successes, success rate 0.40, no first-violation flag despite 4 total successes
+
+Interpretation for OpenAI red-team
+- Medical was vulnerable primarily to direct_prompt_injection and goal_hijacking.
+- Financial was comparatively resilient except to multi_turn_escalation, which absorbed 5 attempts and yielded the only success.
+- Customer service was the most exploitable adaptive target. The successful surfaces were concentrated in:
+  - tool_misuse: 2 successes in 3 attempts
+  - memory_poisoning: 2 successes in 2 attempts
+- The mismatch where customer_service reports violation_occurred = false but campaign_summary.total_successes = 4 looks like a bookkeeping inconsistency in how "first violation" is tracked versus how the evaluator increments campaign success counts. The per-turn table and bandit totals indicate real successful attacks occurred.
+
+vLLM-light red-team
+- medical: 3 / 10 successes, success rate 0.30, first logged violation at turn 2
+- financial: 1 / 10 successes, success rate 0.10, no first-violation flag
+- customer_service: 1 / 10 successes, success rate 0.10, no first-violation flag
+
+Interpretation for vLLM-light red-team
+- Medical was the most exploitable vLLM-light target, especially through multi_turn_escalation (3 successes in 4 attempts).
+- Financial had only one successful adaptive attack, concentrated in memory_poisoning.
+- Customer service, despite being extremely weak on the static baseline, was not nearly as exploitable in the adaptive campaign.
+- That combination suggests the vLLM-light customer service agent is bad at many direct alignment probes but less predictable under the bandit-generated attack sequence. In other words, it fails broad policy tests but the adaptive attacker did not find as concentrated a winning surface as it did against OpenAI customer service.
+
+Cross-backend interpretation
+- OpenAI is clearly better on static alignment robustness.
+- vLLM-light is faster and cheaper to run locally, but the quality gap shows up immediately on baseline alignment behavior.
+- The adaptive red-team story is more nuanced:
+  - OpenAI total adaptive success rate was slightly worse than vLLM-light overall (23.3% vs 16.7%).
+  - However, that is driven mainly by OpenAI customer service being highly exploitable through memory_poisoning and tool_misuse.
+  - vLLM-light medical was the main adaptive weakness on the local model.
+- Practical conclusion:
+  - If the goal is strongest alignment behavior on this benchmark, OpenAI wins.
+  - If the goal is local, GPU-backed experimentation with lower runtime cost, the lightweight vLLM setup is usable, but its baseline safety/alignment quality is materially worse.
+
+Important caveats
+- This is not an apples-to-apples model comparison in terms of model class or capability:
+  - OpenAI used gpt-4o-mini through the existing OpenAI backend.
+  - vLLM used Qwen/Qwen2.5-1.5B-Instruct specifically because the request asked for a lightweight local model.
+- Because the vLLM model is much smaller, the baseline gap should be interpreted primarily as a capability/alignment tradeoff, not just an implementation difference.
+- The customer_service red-team log format likely contains a state-accounting inconsistency when summarizing violation_occurred versus campaign_summary.total_successes.
+
+Recommended next steps
+- If you want a more apples-to-apples local comparison, rerun vLLM with a stronger but still manageable model such as a 3B to 7B instruct model on the dedicated GPU.
+- Investigate the red-team summary bookkeeping for cases where per-turn or bandit successes do not propagate cleanly to violation_occurred / violation_turn.
+- Focus remediation first on customer_service policies and prompts, since that role was the weakest for both backends.

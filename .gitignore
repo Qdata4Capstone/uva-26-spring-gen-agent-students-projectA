@@ -1,2 +1,6 @@
 team-xx/.DS_Store
 .DS_Store
+team-10/src/.venv
+team-10/src/_archive
+team-10/src/__pycache__
+team-10/src/.env
