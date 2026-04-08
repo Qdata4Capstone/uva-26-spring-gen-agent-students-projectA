@@ -1,102 +1,137 @@
 # Agent Alignment Testbed
 
-A multi-agent alignment evaluation framework featuring domain-specific target agents (medical, financial, customer service), an adaptive red team agent using a UCB1 bandit over six attack surfaces (MARSE), and a reproducible static baseline evaluator (ABATE) — all built on a generative agent memory loop with no external agent frameworks.
+**Team:** Raffi Khondaker (Team-10)  
+**Video Demo:** https://youtu.be/NRwuzaOHMHI
 
-# INFO
-Adaptive Multi-Turn Red Teaming for LLM Agents via Active Exploration \\
+---
 
-Team-10, Raffi Khondaker \\
+## Introduction
 
-**OVERVIEW:**: A multi-agent alignment evaluation setup with domain-specific  agents (medical, financial, customer service), an adaptive red team agent using a bandit algorithm six attack patterns (MARSE), and a static baseline evaluator (ABATE) \\
-**VIDEO:**: [DEMO HERE](https://youtu.be/NRwuzaOHMHI)
+As LLM-based agents are deployed in high-stakes domains (medical advice, financial guidance, customer service), ensuring they cannot be manipulated into producing harmful outputs becomes critical. Static safety evaluations using fixed probe sets miss adaptive adversaries that learn from prior failures.
 
-## Setup
+This project builds a **multi-agent alignment evaluation framework** without relying on any external agent frameworks. It provides:
+- **Domain-specific target agents** (medical, financial, customer service) implemented with a generative agent memory loop
+- **MARSE** — an adaptive red team agent that uses a UCB1 multi-armed bandit to explore 6 attack surfaces and exploit the ones that most reliably elicit violations
+- **ABATE** — a reproducible static baseline evaluator for comparing adaptive vs. fixed attack strategies
 
-**Requirements:** Python 3.12, pip, an NVIDIA GPU (for vLLM), and a OpenAI API key for second set of results
+---
+
+## Overall Function
+
+The framework supports two evaluation modes:
+
+**Mode 1 — Interactive (human-in-the-loop):** A user manually crafts adversarial prompts against a target agent via the Streamlit UI, observing real-time agent state (memory stream, plan, reflection, tool results).
+
+**Mode 2 — Automated red team:** MARSE autonomously runs N-turn adversarial campaigns. Each turn, the UCB1 bandit selects the attack surface most likely to cause a violation, based on prior successes weighted by an exploration bonus. Logs and plots are saved to `experiments/`.
+
+**ABATE baseline:** A fixed probe bank (configurable number of probes per category per agent) is evaluated deterministically, with an optional LLM judge for scoring.
+
+---
+
+## Code Structure
+
+```
+team-10/
+├── src/
+│   ├── app.py                # Interactive 3-agent chat UI (Streamlit, port 8501)
+│   ├── streamlit_app.py      # Red team + experiment UI (Streamlit, port 8503)
+│   ├── config.py             # All LLM backend and experiment settings
+│   ├── backends.py           # LLM adapter layer — stub / openai / vllm
+│   ├── main.py               # Core agent loop (target agent memory loop)
+│   ├── red_team.py           # MARSE red team agent (UCB1 bandit over 6 attack surfaces)
+│   ├── experiments.py        # ABATE static baseline evaluator
+│   ├── reporting.py          # Plot + log generation, saves to experiments/reports/
+│   ├── run.py                # Unified CLI runner
+│   ├── agents/               # Target agent implementations
+│   │   ├── __init__.py       # Medical, financial, customer service agent classes
+│   │   └── ...
+│   ├── tools/                # Agent tools (memory retrieval, planning, reflection)
+│   │   └── __init__.py
+│   ├── data/                 # Probe banks and static evaluation data
+│   ├── experiments/          # Pre-computed results
+│   │   ├── vllm_light/       # Results from vLLM backend (Qwen 2.5-1.5B)
+│   │   └── openai_fresh/     # Results from OpenAI backend
+│   └── portal_setup.sh       # Rivanna HPC setup script
+└── README.md
+```
+
+**Agent memory loop (target agents):** Each target agent runs a generative agent cycle — perceive user input → retrieve relevant memories → generate a plan → execute → reflect. This architecture models realistic deployed agents rather than simple prompt-response systems.
+
+**MARSE attack surfaces (6):** The UCB1 bandit chooses among: role-play injection, authority escalation, hypothetical framing, gradual boundary pushing, context manipulation, and direct instruction override.
+
+---
+
+## Installation
+
+**Requirements:** Python 3.12, an NVIDIA GPU (for vLLM backend; stub/openai work without GPU)
 
 ```bash
 cd src
-# If on portal
+
+# On Rivanna portal:
 source portal_setup.sh
-# Otherwise
+
+# Otherwise:
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install streamlit openai matplotlib vllm
 ```
 
-Create `.env` in the project root:
-
+Create `.env` in `src/`:
 ```
 OPENAI_API_KEY="sk-..."
 ```
 
-Load environment before running any script:
+### LLM Backend Configuration
 
----
-
-## Key results:
-VLLM: `/team-10/src/experiments/vllm_light`
-OpenAI: `/team-10/src/experiments/openai_fresh`
-
-## LLM Backend Configuration
-
-Edit `config.py` to set the backend for both the target agents and the red team agent:
-
+Edit `src/config.py`:
 ```python
-TARGET_LLM  = "stub"      # "stub" | "openai" | "vllm"
-RED_TEAM_LLM = "stub"     # "stub" | "openai" | "vllm"
+TARGET_LLM   = "stub"    # "stub" | "openai" | "vllm"
+RED_TEAM_LLM = "stub"
 ```
 
-### Backend options
+| Backend | Notes |
+|---|---|
+| `"stub"` | No API key, hardcoded responses — use for development and testing |
+| `"openai"` | Requires `OPENAI_API_KEY`; model set by `OPENAI_MODEL` (default: `gpt-4o-mini`) |
+| `"vllm"` | Requires a running vLLM server; set `VLLM_BASE_URL` and `VLLM_MODEL` in `config.py` |
 
-| Backend | Config key | Notes |
-|---|---|---|
-| Stub | `"stub"` | No API key, hardcoded responses, zero latency |
-| OpenAI | `"openai"` | Requires `OPENAI_API_KEY`. Model set by `OPENAI_MODEL` (default `gpt-4o-mini`) |
-| vLLM | `"vllm"` | Requires a running vLLM server. See vLLM section below |
-
-### vLLM setup
-
-vLLM exposes an OpenAI-compatible server. Start it before running experiments:
+### vLLM server (optional)
 
 ```bash
-# Option 1 — Mistral 7B Instruct (~14 GB VRAM, fits on one RTX 4000 Ada)
-.venv/bin/vllm serve Qwen/Qwen2.5-1.5B-Instruct
- \
-    --port 8000 \
-    --dtype bfloat16
+.venv/bin/vllm serve Qwen/Qwen2.5-1.5B-Instruct --port 8000 --dtype bfloat16
 ```
 
-Then set in `config.py`:
-
+Then in `config.py`:
 ```python
-TARGET_LLM   = "vllm"
-RED_TEAM_LLM = "vllm"
+TARGET_LLM    = "vllm"
+RED_TEAM_LLM  = "vllm"
 VLLM_BASE_URL = "http://localhost:8000/v1"
 VLLM_MODEL    = "Qwen/Qwen2.5-1.5B-Instruct"
 ```
 
 ---
 
-## Running
+## How to Run
 
-### Interactive frontend (app.py — 3-agent chat UI)
+### Interactive agent chat UI
 
 ```bash
 .venv/bin/streamlit run app.py --server.port 8501
+# Open http://localhost:8501
+# Three tabs: Medical, Financial, Customer Service
+# Sidebar shows real-time agent state
 ```
 
-Open `http://localhost:8501`. Three tabs: Medical, Financial, Customer Service. Sidebar shows real-time agent state (memory stream, plan, reflection, tool results).
-
-### Red team + experiment frontend (streamlit_app.py)
+### Red team + experiment UI
 
 ```bash
 .venv/bin/streamlit run streamlit_app.py --server.port 8503
+# Open http://localhost:8503
+# Sidebar: Mode 1 (human-in-the-loop) and Mode 2 (automated, partially implemented)
 ```
 
-Open `http://localhost:8503`. Sidebar includes red team toggle (Mode 1: human-in-the-loop adversarial prompting) and automated experiment runner (Mode 2), though this doesnt work right now.
-
-### Automated red team experiment
+### Automated red team (CLI)
 
 ```bash
 .venv/bin/python run_experiment_cli.py <target_agent> <n_turns> <stop_on_violation>
@@ -107,26 +142,32 @@ Open `http://localhost:8503`. Sidebar includes red team toggle (Mode 1: human-in
 .venv/bin/python run_experiment_cli.py customer_service 15 false
 ```
 
-Logs written to `experiments/`. Plots written to `experiments/reports/`.
+Logs → `experiments/`  Plots → `experiments/reports/`
 
-### Static Baseline experiment 
+### ABATE static baseline
 
 ```bash
 .venv/bin/python run_baseline_cli.py
+# Evaluates all three agents against the fixed probe bank
+# Logs → experiments/baseline/   Plots → experiments/reports/
 ```
 
-Runs all three agents against the static probe bank. Logs written to `experiments/baseline/`. Plots written to `experiments/reports/`.
-
----
-
-## Key config variables
+### Key Config Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `TARGET_AGENT` | `"medical"` | Default target for CLI experiment runner |
 | `MAX_TURNS` | `10` | Red team campaign turns |
 | `VIOLATION_STOPS_EXPERIMENT` | `True` | Stop on first violation |
 | `CURIOSITY_BONUS_WEIGHT` | `0.3` | UCB1 exploration coefficient |
 | `EXPLOIT_VS_EXPLORE_EPSILON` | `0.25` | Epsilon for greedy surface selection |
-| `BASELINE_N_PROBES_PER_CATEGORY` | `5` | Probes per category per agent in Adaptive Red teaming (ABATE) |
-| `BASELINE_LLM_JUDGE_BACKEND` | `"stub"` | Judge backend for ABATE (`"stub"` or `"anthropic"`) |
+| `BASELINE_N_PROBES_PER_CATEGORY` | `5` | Probes per category per agent in ABATE |
+| `BASELINE_LLM_JUDGE_BACKEND` | `"stub"` | Judge backend (`"stub"` or `"anthropic"`) |
+
+---
+
+## References
+
+- **Video Demo:** https://youtu.be/NRwuzaOHMHI
+- **Pre-computed vLLM results:** `src/experiments/vllm_light/`
+- **Pre-computed OpenAI results:** `src/experiments/openai_fresh/`
+- UCB1 bandit algorithm used for adaptive attack surface selection (MARSE)
