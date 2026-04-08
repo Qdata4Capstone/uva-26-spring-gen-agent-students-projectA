@@ -1,0 +1,80 @@
+---
+alwaysApply: true
+---
+
+# EnvCheck — Project Context & Research Goal
+
+## What This Project Is
+
+EnvCheck is a research project building a **proactive code environment diagnostic system**. The core thesis:
+
+> LLMs generate code based on training data that may reference **outdated or removed APIs**. When this code runs in an environment with newer library versions, it crashes at runtime. EnvCheck detects these mismatches **before execution**.
+
+## The Problem We Are Solving
+
+When an AI agent (e.g., Cursor, Copilot, ChatGPT) generates Python code, it draws from training data that may be months or years old. Libraries evolve — functions get renamed, removed, or have their signatures changed. The generated code "looks correct" but fails at runtime with `AttributeError`, `ImportError`, or `TypeError`.
+
+**Current tools don't catch this:**
+- `pip check` only finds transitive dependency conflicts, not API-level issues
+- `mypy` checks types, not whether a function still exists in the installed version
+- `ruff`/`pylint` check style, not runtime compatibility
+- `pytest` tells you tests fail, but doesn't diagnose WHY
+
+## Project Structure
+
+```
+EnvCheck/
+├── .cursor/
+│   ├── commands/
+│   │   └── envcheck.diagnose.md    # The diagnostic command definition
+│   └── rules/
+│       └── envcheck-project.mdc    # This file — agent context
+├── test_cases/
+│   └── cases.py                    # All test case definitions (problem + env + expected failure)
+├── environments/                   # Per-case isolated uv environments (gitignored)
+├── docs/
+│   └── envcheck-command-explanation.md  # Detailed explanation doc
+├── main.py                         # Demo runner — orchestrates the live demo
+└── pyproject.toml
+```
+
+## How to Use uv for Isolated Test Environments
+
+Each test case has a specific library version requirement that conflicts with what LLMs typically generate. Use `uv` to create isolated environments per case:
+
+```bash
+# Create a case-specific virtual environment
+uv venv environments/case_numpy --python 3.12
+# Install the specific problematic version
+VIRTUAL_ENV=environments/case_numpy uv pip install "numpy>=2.0.0"
+# Run the LLM-generated (broken) code in that environment
+environments/case_numpy/bin/python test_cases/generated/numpy_case.py
+```
+
+## Key Research Questions
+
+1. Can we reliably detect API breaking changes by scanning source code against a knowledge base of known changes?
+2. How do we build and maintain the "known breaking changes" knowledge base per library?
+3. What is the false positive rate? Can we keep it near zero?
+4. Can this run fast enough to be a pre-execution gate in an interactive agent workflow?
+
+## Live Demo Flow
+
+The demo should show this loop for each test case:
+
+1. **Show the Problem**: Display the prompt that an LLM would receive
+2. **Show LLM Output**: Show the (broken) code an LLM would generate
+3. **Show the Crash**: Run it in the target environment → RuntimeError
+4. **Run EnvCheck**: Run `/envcheck.diagnose` → it catches the issue BEFORE running
+5. **Show the Fix**: Display what the correct modern API should be
+6. **Run Fixed Code**: Confirm it works
+
+## Test Case Design Principle
+
+Each test case MUST have:
+- `problem`: A natural-language prompt that reliably triggers LLMs to use outdated APIs
+- `environment`: Exact pip install command with version pins
+- `expected_failure`: What error will occur and why
+- `broken_code`: What the LLM will almost certainly generate
+- `fixed_code`: The correct modern equivalent
+- `breaking_change`: Structured description of what changed (old API → new API, version boundary)
