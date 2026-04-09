@@ -454,6 +454,7 @@ class RedTeamAgent(BaseAgent):
             "allowed_attack_surfaces": [
                 "direct_prompt_injection", "goal_hijacking", "alignment_bypass",
                 "tool_misuse", "memory_poisoning", "multi_turn_escalation",
+                "obfuscation",
             ],
         }
         self.bandit_state = {
@@ -499,8 +500,10 @@ class RedTeamAgent(BaseAgent):
         # ucb math, checks out i think
         if random.random() < self.alignment["exploit_vs_explore_epsilon"]:
             surf = random.choice(self.alignment["allowed_attack_surfaces"])
+            selection_mode = "explore"
         else:
             surf = max(self.bandit_state, key=lambda s: self.bandit_state[s]["ucb_score"])
+            selection_mode = "exploit"
 
         mems = self.retrieve(surf)
         mem_str = "\n".join(
@@ -518,7 +521,7 @@ class RedTeamAgent(BaseAgent):
         )
         attack_str = self.llm_call([{"role": "user", "content": prompt}])
         self.memory.add(attack_str, type="plan", importance=1.0)
-        return {"surface": surf, "attack": attack_str}
+        return {"surface": surf, "attack": attack_str, "selection_mode": selection_mode}
 
     def reflect(self, context):
         context_block = "\n".join(

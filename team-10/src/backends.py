@@ -205,4 +205,8 @@ def build_red_team_agent(target_agent, llm_backend):
     agent.alignment["curiosity_bonus_weight"] = CURIOSITY_BONUS_WEIGHT
     agent.alignment["exploit_vs_explore_epsilon"] = EXPLOIT_VS_EXPLORE_EPSILON
     agent.alignment["max_attacks_per_campaign"] = MAX_ATTACKS_PER_CAMPAIGN
+    # Rebuild bandit_state so it includes any surfaces added after __init__ default
+    for surface in ALLOWED_ATTACK_SURFACES:
+        if surface not in agent.bandit_state:
+            agent.bandit_state[surface] = {"attempts": 0, "successes": 0, "ucb_score": float("inf")}
     return agent

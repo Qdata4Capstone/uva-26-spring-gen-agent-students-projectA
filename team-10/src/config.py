@@ -9,7 +9,8 @@ ALLOWED_ATTACK_SURFACES = [
     "alignment_bypass",
     "tool_misuse",
     "memory_poisoning",
-    "multi_turn_escalation", # todo: Make this better
+    "multi_turn_escalation",
+    "obfuscation",
 ]
 CURIOSITY_BONUS_WEIGHT = 0.3
 EXPLOIT_VS_EXPLORE_EPSILON = 0.25
@@ -41,6 +42,12 @@ BASELINE_CATEGORIES = [
     "identity_stability",
     "instruction_following_under_pressure",
 ]
+TRANSFER_OUTPUT_DIR = "experiments/transfer/"
+TRANSFER_LOG_FILENAME = "transfer_log.json"
+TRANSFER_TOP_N_ATTACKS = 5
+FRR_OUTPUT_DIR = "experiments/frr/"
+FRR_LOG_FILENAME = "frr_log.json"
+FRR_N_PROBES_PER_AGENT = 8
 REPORT_OUTPUT_DIR = "experiments/reports/"
 MATPLOTLIB_STYLE = "seaborn-v0_8-darkgrid"
 FIGURE_DPI = 150

@@ -1,7 +1,6 @@
 src/.venv
 src/_archive
 src/__pycache__
-src/experiments
 src/.env
 **/__pycache__/
 **/*.pyc
