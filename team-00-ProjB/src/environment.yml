@@ -1,0 +1,12 @@
+name: gpu_monitor
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - flask
+      - openai
+      - ddgs
+      - requests

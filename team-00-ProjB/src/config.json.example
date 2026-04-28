@@ -1,0 +1,27 @@
+{
+  "_comment": "Copy this file to config.json and fill in your values.",
+
+  "script_dir": "/home/YOUR_USER/Q",
+  "conda_env": "/path/to/your/conda/envs/gpu_monitor",
+
+  "port": 8080,
+
+  "slurm_job_name": "lemon",
+  "slurm_partition": "standard",
+  "slurm_time": "07:00:00",
+
+  "openai_model": "gpt-4o",
+
+  "clusters": {
+    "cs": {
+      "name": "CS",
+      "ssh": null,
+      "account": null
+    },
+    "hpc": {
+      "name": "Rivanna",
+      "ssh": "ssh -o ConnectTimeout=10 -o BatchMode=yes YOUR_USER@login.hpc.virginia.edu",
+      "account": "YOUR_ALLOCATION"
+    }
+  }
+}
