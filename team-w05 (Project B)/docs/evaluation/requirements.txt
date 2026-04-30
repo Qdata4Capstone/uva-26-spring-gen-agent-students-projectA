@@ -1,0 +1,4 @@
+requests
+datasets
+anthropic
+matplotlib
