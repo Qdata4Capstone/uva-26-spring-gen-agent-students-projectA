@@ -173,4 +173,22 @@ temp/
 
 .gradio/
 
+.chainlit/
+
+.files/
+
 mydownload/
+
+# Local datasets / model caches (not redistributed)
+chestagentbench/
+eurorad_dataset/
+eurorad_dataset2/
+
+# Generated figures (large, regenerable)
+figures/
+
+# Evaluation outputs (regenerable from scripts)
+*.jsonl
+
+# Project report PDFs (kept locally, not committed)
+*.pdf
