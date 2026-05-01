@@ -1,116 +1,108 @@
-"""
-run.py — unified CLI entry point.
-
-Usage:
-  python run.py experiment <target_agent> <n_turns> <stop_on_violation>
-  python run.py baseline
-  python run.py frr
-  python run.py transfer <source_log_path> [top_n]
-  python run.py --help
-
-Subcommands:
-  experiment   Run an adaptive red-team experiment (MARSE).
-               Args: target_agent (medical|financial|customer_service)
-                     n_turns      (int, default from config)
-                     stop_on_violation (true|false, default from config)
-  baseline     Run the static probe bank experiment (ABATE) for all three agents.
-  frr          Run the False Refusal Rate experiment on all three agents.
-               Sends benign legitimate queries and measures over-refusal rate.
-               Target: FRR < 5% per agent.
-  transfer     Replay top-N attacks from a MARSE log against all agents.
-               Args: source_log_path  path to a campaign_log.json
-                     top_n            (int, default from config)
-"""
-
 import os
+import re
 import sys
 
-
-def _load_env(path=".env"):
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip().strip('"'))
-
-
-_load_env()
-
 import config
-from experiments import (
-    run_experiment, summarize_experiment,
-    run_baseline_experiment,
-    run_frr_experiment,
-    run_transfer_experiment,
-)
-from reporting import run_redteam_plots, run_baseline_plots, run_frr_plots
+from experiments import run_experiment, summarize_experiment, run_baseline_experiment
+from reporting import run_redteam_plots, run_baseline_plots
 
+
+# short use note:
+# python run.py experiment <target_agent> <n_turns> <stop_on_violation>
+# python run.py cross <n_turns> <stop_on_violation> [cross_only=true]
+# python run.py baseline
 
 def _usage():
-    print(__doc__.strip())
+    print("python run.py experiment <target_agent> <n_turns> <stop_on_violation>")
+    print("python run.py cross <n_turns> <stop_on_violation> [cross_only=true]")
+    print("python run.py baseline")
     sys.exit(1)
 
 
-def cmd_experiment(args):
-    target_agent_name = args[0] if len(args) > 0 else config.TARGET_AGENT
-    n_turns = int(args[1]) if len(args) > 1 else config.MAX_TURNS
-    stop_on_violation = args[2].lower() == "true" if len(args) > 2 else config.VIOLATION_STOPS_EXPERIMENT
+def _safePathPiece(text):
+    return re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(text or "")).strip("_") or "unknown"
 
-    result = run_experiment(
-        target_agent_name=target_agent_name,
-        n_turns=n_turns,
-        stop_on_violation=stop_on_violation,
-    )
-    print(summarize_experiment(result))
-    run_redteam_plots(result, config.REPORT_OUTPUT_DIR)
-    print(f"Red team plots saved to {config.REPORT_OUTPUT_DIR}")
+
+def cmd_experiment(args):
+    # targetAgentName = config.TARGET_AGENT
+    targetAgentName = args[0] if len(args) > 0 else config.TARGET_AGENT
+
+    # nTurns = int(args[1]) if len(args) > 1 else 8
+    # nTurns = int(args[1]) if len(args) > 1 else 12
+    nTurns = int(args[1]) if len(args) > 1 else config.MAX_TURNS
+
+    # stopOnViolation = True
+    stopOnViolation = args[2].lower() == "true" if len(args) > 2 else config.VIOLATION_STOPS_EXPERIMENT
+
+
+    resultObj = run_experiment(target_agent_name=targetAgentName, n_turns=nTurns, stop_on_violation=stopOnViolation)
+    print(summarize_experiment(resultObj))
+
+    experimentDir = os.path.join(config.REPORT_OUTPUT_DIR, "experiment", _safePathPiece(targetAgentName), _safePathPiece(resultObj.get("experiment_id", "unknown_experiment")))
+
+    run_redteam_plots(resultObj, experimentDir)
+    print(f"red team plots saved to {experimentDir}")
+
+
+def cmd_cross(args):
+    # agentList = ["medical", "financial", "customer_service"]
+    agentList = ["medical", "weak_medical", "financial", "customer_service"]
+
+    # nTurns = config.MAX_TURNS
+    nTurns = int(args[0]) if len(args) > 0 else config.MAX_TURNS
+
+    stopOnViolation = args[1].lower() == "true" if len(args) > 1 else config.VIOLATION_STOPS_EXPERIMENT
+
+    # crossOnly = True
+    # crossOnly = False
+    crossOnly = args[2].lower() != "false" if len(args) > 2 else True
+
+    # pairs = [(attacker, target) for attacker in agentList for target in agentList if attacker != target]
+    pairs = [(attacker, target) for attacker in agentList for target in agentList if not crossOnly or attacker != target]
+
+
+    labelText = "cross-domain only" if crossOnly else "all combinations"
+    print(f"running {len(pairs)} attacker target pair(s) ({labelText})")  # keep this plain
+
+    for attacker, target in pairs:
+        print(f"\n{'=' * 60}")
+        print(f"attacker domain: {attacker} to target agent: {target}")
+        print(f"{'=' * 60}")
+
+        resultObj = run_experiment(target_agent_name=target, n_turns=nTurns, stop_on_violation=stopOnViolation, red_team_domain=attacker)
+        print(summarize_experiment(resultObj))
+
+        pairDir = os.path.join(config.REPORT_OUTPUT_DIR, "cross", f"{_safePathPiece(attacker)}_to_{_safePathPiece(target)}", _safePathPiece(resultObj.get("experiment_id", "unknown_experiment")))
+        run_redteam_plots(resultObj, pairDir)
+        print(f"red team plots saved to {pairDir}")
 
 
 def cmd_baseline(_args):
-    log_dict = run_baseline_experiment()
-    run_baseline_plots(log_dict, output_dir=config.REPORT_OUTPUT_DIR)
-    print("Baseline experiment complete.")
-    print(config.REPORT_OUTPUT_DIR)
+    baseLog = run_baseline_experiment()
+
+    baselineDir = os.path.join(config.REPORT_OUTPUT_DIR, "baseline", _safePathPiece(baseLog.get("experiment_id", "unknown_baseline")))
+    run_baseline_plots(baseLog, output_dir=baselineDir)
 
 
-def cmd_frr(_args):
-    frr_log = run_frr_experiment()
-    run_frr_plots(frr_log, output_dir=config.REPORT_OUTPUT_DIR)
-    print("FRR experiment complete.")
-    print(config.REPORT_OUTPUT_DIR)
-
-
-def cmd_transfer(args):
-    if not args:
-        print("Usage: python run.py transfer <source_log_path> [top_n]")
-        _usage()
-    source_log_path = args[0]
-    top_n = int(args[1]) if len(args) > 1 else config.TRANSFER_TOP_N_ATTACKS
-    run_transfer_experiment(source_log_path, top_n=top_n)
-    print("Transfer experiment complete.")
+    print("baseline experiment complete")
+    print(baselineDir)
 
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         _usage()
 
-    subcommand = sys.argv[1]
-    rest = sys.argv[2:]
+    subCommand = sys.argv[1]
+    restArgs = sys.argv[2:]
 
-    if subcommand == "experiment":
-        cmd_experiment(rest)
-    elif subcommand == "baseline":
-        cmd_baseline(rest)
-    elif subcommand == "frr":
-        cmd_frr(rest)
-    elif subcommand == "transfer":
-        cmd_transfer(rest)
+    if subCommand == "experiment":
+        cmd_experiment(restArgs)
+    elif subCommand == "cross":
+        cmd_cross(restArgs)
+    elif subCommand == "baseline":
+        cmd_baseline(restArgs)
     else:
-        print(f"Unknown subcommand: {subcommand!r}")
+        print(f"unknown subcommand: {subCommand!r}")
         _usage()
 
 
