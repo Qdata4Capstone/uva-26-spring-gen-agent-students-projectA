@@ -24,11 +24,67 @@ from config import (
 )
 
 
+def _primary_violation_detected(score):
+    if not isinstance(score, dict):
+        return False
+    if "reporting_violation_detected" in score:
+        return bool(score.get("reporting_violation_detected"))
+    return bool(score.get("violation_detected", False))
+
+
+def _primary_severity(score):
+    if not isinstance(score, dict):
+        return 0.0
+    raw = score.get("reporting_severity", score.get("severity", 0.0))
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _apply_style():
     try:
         plt.style.use(MATPLOTLIB_STYLE)
     except OSError:
         plt.style.use("ggplot")
+
+
+def _ci_halfwidth(mean_value, ci_entry):
+    if not isinstance(ci_entry, dict):
+        return 0.0
+    low = ci_entry.get("low")
+    high = ci_entry.get("high")
+    if low is None or high is None:
+        return 0.0
+    try:
+        low = float(low)
+        high = float(high)
+        mean_value = float(mean_value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(abs(mean_value - low), abs(high - mean_value))
+
+
+def _redteam_primary_counts(redteam_log):
+    turns = list(redteam_log.get("turns", []))
+    if turns:
+        attempts = len(turns)
+        violations = sum(
+            1 for turn in turns
+            if _primary_violation_detected(turn.get("score", {}))
+        )
+        return attempts, violations
+
+    attempts = int(redteam_log.get("total_turns", 0) or 0)
+    violations = int(redteam_log.get("reporting_violation_count", 0) or 0)
+    if attempts > 0:
+        return attempts, violations
+
+    # Backward compatibility for older logs that only have campaign summary.
+    campaign = redteam_log.get("campaign_summary", {})
+    attempts = int(campaign.get("total_attempts", 0) or 0)
+    violations = int(campaign.get("total_successes", 0) or 0)
+    return attempts, violations
 
 
 # ---------------------------------------------------------------------------
@@ -37,16 +93,30 @@ def _apply_style():
 
 def plot_violation_rate_by_agent(log_dict, output_dir):
     _apply_style()
-    agent_names = list(log_dict["summary"]["overall_violation_rates"].keys())
-    rates = [log_dict["summary"]["overall_violation_rates"][a] for a in agent_names]
+    overall = log_dict.get("summary", {}).get("overall_violation_rates", {})
+    ci95 = log_dict.get("summary", {}).get("overall_violation_rates_ci95", {})
+    agent_names = list(overall.keys())
+    rates = [overall[a] for a in agent_names]
+    xerr = [_ci_halfwidth(overall[a], ci95.get(a, {})) for a in agent_names]
     cmap = matplotlib.colormaps["tab10"]
     colors = [cmap(i) for i in range(len(agent_names))]
 
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
-    ax.barh(agent_names, rates, color=colors)
+    any_ci = any(v > 0 for v in xerr)
+    ax.barh(
+        agent_names,
+        rates,
+        color=colors,
+        xerr=(xerr if any_ci else None),
+        capsize=(4 if any_ci else 0),
+        error_kw={"elinewidth": 1.3} if any_ci else None,
+    )
     ax.axvline(x=0.5, color="red", linestyle="--", label="50% threshold")
     ax.set_xlim(0.0, 1.0)
-    ax.set_title("Overall Alignment Violation Rate by Agent (ABATE Baseline)")
+    if any_ci:
+        ax.set_title("Overall Alignment Violation Rate by Agent (ABATE Baseline, 95% CI)")
+    else:
+        ax.set_title("Overall Alignment Violation Rate by Agent (ABATE Baseline)")
     ax.set_xlabel("Violation Rate")
     ax.set_ylabel("Agent")
     ax.legend()
@@ -191,7 +261,7 @@ def plot_attack_success_over_turns(log_dict, output_dir):
     violations_so_far = 0
 
     for i, turn in enumerate(turns):
-        if turn["score"]["violation_detected"]:
+        if _primary_violation_detected(turn.get("score", {})):
             violations_so_far += 1
             violation_turns.append(i + 1)
         cumulative_rates.append(violations_so_far / (i + 1))
@@ -205,7 +275,7 @@ def plot_attack_success_over_turns(log_dict, output_dir):
         ax.scatter(violation_turns, viol_rates, color="red", zorder=5, label="Violation")
         ax.legend()
 
-    ax.set_title("Cumulative Attack Success Rate Over Turns")
+    ax.set_title("Cumulative Reporting Violation Rate Over Turns (Primary Metric)")
     ax.set_xlabel("Turn")
     ax.set_ylabel("Cumulative Success Rate")
     fig.tight_layout()
@@ -229,7 +299,7 @@ def plot_bandit_state(log_dict, output_dir):
     ax.bar([xi + bar_width / 2 for xi in x], successes, width=bar_width, color=cmap(1), label="successes")
     ax.set_xticks(list(x))
     ax.set_xticklabels(surfaces, rotation=20, ha="right")
-    ax.set_title("Bandit State: Attempts vs Successes by Attack Surface")
+    ax.set_title("Bandit State (Rule Metric): Attempts vs Successes by Attack Surface")
     ax.set_xlabel("Attack Surface")
     ax.set_ylabel("Count")
     ax.legend()
@@ -240,14 +310,31 @@ def plot_bandit_state(log_dict, output_dir):
 
 def plot_surface_violation_rate(log_dict, output_dir):
     _apply_style()
-    bandit = log_dict.get("bandit_final_state", {})
+    turns = list(log_dict.get("turns", []))
+    per_surface = {}
+    for turn in turns:
+        surface = turn.get("surface")
+        if not surface:
+            continue
+        bucket = per_surface.setdefault(surface, {"attempts": 0, "violations": 0})
+        bucket["attempts"] += 1
+        if _primary_violation_detected(turn.get("score", {})):
+            bucket["violations"] += 1
+
+    # Backward compatibility for older logs that may not have turn-level scores.
+    if not per_surface:
+        bandit = log_dict.get("bandit_final_state", {})
+        for surface, state in bandit.items():
+            attempts = int(state.get("attempts", 0))
+            successes = int(state.get("successes", 0))
+            if attempts > 0:
+                per_surface[surface] = {"attempts": attempts, "violations": successes}
 
     surface_rates = {}
-    for surface, state in bandit.items():
-        attempts = state.get("attempts", 0)
-        successes = state.get("successes", 0)
+    for surface, bucket in per_surface.items():
+        attempts = bucket["attempts"]
         if attempts > 0:
-            surface_rates[surface] = successes / attempts
+            surface_rates[surface] = bucket["violations"] / attempts
 
     sorted_surfaces = sorted(surface_rates, key=surface_rates.get, reverse=True)
     rates = [surface_rates[s] for s in sorted_surfaces]
@@ -262,8 +349,8 @@ def plot_surface_violation_rate(log_dict, output_dir):
             va="center",
         )
     ax.set_xlim(0.0, 1.1)
-    ax.set_title("Violation Rate by Attack Surface")
-    ax.set_xlabel("Violation Rate (successes / attempts)")
+    ax.set_title("Primary Violation Rate by Attack Surface (Reporting-First)")
+    ax.set_xlabel("Primary Violation Rate (violations / attempts)")
     fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "surface_violation_rate.png"), dpi=FIGURE_DPI)
     plt.close(fig)
@@ -273,12 +360,12 @@ def plot_novelty_over_turns(log_dict, output_dir):
     _apply_style()
     turns = log_dict["turns"]
     x = [t["turn"] for t in turns]
-    y = [t["score"].get("severity", 0.0) for t in turns]
+    y = [_primary_severity(t.get("score", {})) for t in turns]
 
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
     ax.plot(x, y, linewidth=2)
     ax.fill_between(x, y, alpha=0.2)
-    ax.set_title("Attack Severity Score by Turn")
+    ax.set_title("Primary Severity Score by Turn (Reporting-First)")
     ax.set_xlabel("Turn")
     ax.set_ylabel("Severity Score")
     fig.tight_layout()
@@ -287,15 +374,15 @@ def plot_novelty_over_turns(log_dict, output_dir):
 
 
 def generate_redteam_table(log_dict):
-    header = ["Turn", "Surface", "Violation Detected", "Severity", "Blocked at Perceive"]
+    header = ["Turn", "Surface", "Primary Violation", "Primary Severity", "Blocked at Perceive"]
     rows = []
     for turn in log_dict["turns"]:
         score = turn.get("score", {})
         rows.append([
             turn["turn"],
             turn["surface"],
-            "Yes" if score.get("violation_detected", False) else "No",
-            f"{score.get('severity', 0.0):.2f}",
+            "Yes" if _primary_violation_detected(score) else "No",
+            f"{_primary_severity(score):.2f}",
             "Yes" if turn["target_result_summary"].get("blocked_at_perceive", False) else "No",
         ])
     return header, rows
@@ -328,10 +415,8 @@ def plot_baseline_vs_redteam_violation_rate(baseline_log, redteam_log, output_di
     _apply_style()
     agent_names = list(baseline_log.get("summary", {}).get("overall_violation_rates", {}).keys())
 
-    campaign = redteam_log.get("campaign_summary", {})
-    total_attempts = campaign.get("total_attempts", 0)
-    total_successes = campaign.get("total_successes", 0)
-    redteam_rate = total_successes / total_attempts if total_attempts > 0 else 0.0
+    total_attempts, primary_violations = _redteam_primary_counts(redteam_log)
+    redteam_rate = primary_violations / total_attempts if total_attempts > 0 else 0.0
     redteam_target = redteam_log.get("target_agent", None)
 
     bar_width = 0.35
@@ -361,7 +446,7 @@ def plot_baseline_vs_redteam_violation_rate(baseline_log, redteam_log, output_di
     ax.set_xticks(list(x))
     ax.set_xticklabels(agent_names)
     ax.set_ylim(0.0, 1.05)
-    ax.set_title("Baseline vs Red Team Violation Rate by Agent")
+    ax.set_title("Baseline vs Red Team Violation Rate by Agent (Reporting-First)")
     ax.set_xlabel("Agent")
     ax.set_ylabel("Violation Rate")
     ax.legend()
@@ -381,9 +466,7 @@ def plot_efficiency_comparison(baseline_log, redteam_log, output_dir):
         for res in baseline_log.get("results", {}).values()
     )
 
-    campaign = redteam_log.get("campaign_summary", {})
-    redteam_probes = campaign.get("total_attempts", 0)
-    redteam_violations = campaign.get("total_successes", 0)
+    redteam_probes, redteam_violations = _redteam_primary_counts(redteam_log)
 
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
     ax.scatter(
@@ -418,7 +501,7 @@ def plot_efficiency_comparison(baseline_log, redteam_log, output_dir):
     )
     ax.set_title("Efficiency: Violations Found vs Probes Used")
     ax.set_xlabel("Total Probes / Attacks Used")
-    ax.set_ylabel("Violations Found")
+    ax.set_ylabel("Violations Found (Primary Metric)")
     ax.legend()
     fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "efficiency_comparison.png"), dpi=FIGURE_DPI)
