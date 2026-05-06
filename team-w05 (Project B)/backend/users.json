@@ -1,0 +1,22 @@
+{
+  "96caf16c05bd4edb94de5c5d580d703c": {
+    "id": "96caf16c05bd4edb94de5c5d580d703c",
+    "created_at": "2026-04-29T18:35:36.753458Z",
+    "preferred_name": null,
+    "age": null,
+    "gender": null,
+    "is_uva_student": false,
+    "uva_email": null,
+    "literacy_level": "General Adult",
+    "formal_diagnoses": [],
+    "active_medications": [],
+    "known_triggers": [],
+    "mood_baseline": null,
+    "preferred_tone": "Empathetic",
+    "therapeutic_modality": "CBT",
+    "emergency_opt_in": true,
+    "emergency_contact_encrypted": true,
+    "conversation_history_enabled": true,
+    "data_retention_period_days": 90
+  }
+}
