@@ -1,0 +1,23 @@
+⏺ All 8 improvement plan files have been created. Here's a summary of what was written:
+
+  ┌──────────────────────────────┬───────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │             Team             │               File                │                                               Key Focus Areas                                               │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-00 (Obscura)            │ team-00/IMPROVEMENT_PLAN.md       │ Remove hardcoded paths, fix unused resolve_conflicts(), video input support, BEFORE/AFTER report samples    │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-07 (MedRAX)             │ team-07/IMPROVEMENT_PLAN.md       │ Fix broken model name (gpt-5.2), define missing RAG tool classes, standardize return types, add tests       │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-9 (p2p-trade-bot)       │ team-9/IMPROVEMENT_PLAN.md        │ Implement real trade execution, TOTALS/PLAYER_PROP strategies, missing Researcher agent, structured logging │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-10 (MARSE)              │ team-10/IMPROVEMENT_PLAN.md       │ Fix missing RAG tool ImportError, replace LLMJudge stub, strengthen perceive-layer detection, unit tests    │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-11 (FinSynth)           │ team-11/IMPROVEMENT_PLAN.md       │ Parallelize Auditor+News Hound nodes, add retries/timeouts, ticker validation, caching, rate limiting       │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-6 (CardioRAG-CX)        │ team-6/IMPROVEMENT_PLAN.md        │ Implement ECGFounder NotImplementedError, move hardcoded API keys, fix DICOM HU values, temp cleanup        │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-envcheck                │ team-envcheck/IMPROVEMENT_PLAN.md │ Expand KB from 20 to 100+ rules, pre-commit hook, exit code 1 on findings, CI workflow                      │
+  ├──────────────────────────────┼───────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-w05 (Patient Education) │ team-w05/IMPROVEMENT_PLAN.md      │ Fix broken drug.js, rate limiting, emergency modal UI, test suite, multi-language MVP                       │
+  └──────────────────────────────┴───────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Each plan is structured into 4 priority tiers with concrete, actionable steps — not vague suggestions.
