@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnvPilot — Proactive Code Environment Diagnostics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2332;
+  --bg-input: #0d1321;
+  --border: #1e293b;
+  --border-focus: #3b82f6;
+  --text: #e2e8f0;
+  --text-dim: #64748b;
+  --text-bright: #f8fafc;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.15);
+  --green: #10b981;
+  --green-glow: rgba(16, 185, 129, 0.15);
+  --amber: #f59e0b;
+  --amber-glow: rgba(245, 158, 11, 0.15);
+  --red: #ef4444;
+  --red-glow: rgba(239, 68, 68, 0.15);
+  --purple: #8b5cf6;
+  --purple-glow: rgba(139, 92, 246, 0.15);
+  --cyan: #06b6d4;
+  --radius: 10px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', system-ui, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ---- Layout ---- */
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.logo h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: -0.02em;
+}
+
+.logo span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.health-badge {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.health-badge.online {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-glow);
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---- Input area ---- */
+.input-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.input-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.input-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+textarea, input[type="text"] {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+textarea:focus, input[type="text"]:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.btn {
+  padding: 0.65rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #2563eb);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--bg-card-hover); }
+
+/* ---- DAG Workflow ---- */
+.dag-container {
+  margin-bottom: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  overflow-x: auto;
+}
+.dag-container svg {
+  display: block;
+  margin: 0 auto;
+  min-width: 700px;
+  max-width: 100%;
+  height: auto;
+}
+
+.dag-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 2.5;
+  transition: stroke 0.4s;
+}
+.dag-edge.active {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 10 5;
+  animation: dashFlow 0.6s linear infinite;
+}
+.dag-edge.complete {
+  stroke: var(--green);
+  stroke-width: 3;
+  stroke-dasharray: none;
+  animation: none;
+}
+.dag-edge.failed {
+  stroke: var(--red);
+  stroke-width: 2;
+  stroke-dasharray: none;
+  animation: none;
+}
+.dag-edge-retry {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  opacity: 0.4;
+  transition: all 0.4s;
+}
+.dag-edge-retry.active {
+  stroke: var(--amber);
+  opacity: 1;
+  animation: dashFlow 0.8s linear infinite;
+}
+
+.dag-arrow {
+  fill: var(--border);
+  transition: fill 0.4s;
+}
+.dag-arrow.active { fill: var(--accent); }
+.dag-arrow.complete { fill: var(--green); }
+
+.dag-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  fill: var(--text-dim);
+  transition: fill 0.3s;
+}
+.dag-label.active { fill: var(--accent); }
+.dag-label.complete { fill: var(--green); }
+
+.dag-node rect {
+  fill: var(--bg-input);
+  stroke: var(--border);
+  stroke-width: 1.5;
+  rx: 8;
+  ry: 8;
+  transition: all 0.4s;
+}
+.dag-node text {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  fill: var(--text-dim);
+  text-anchor: middle;
+  dominant-baseline: central;
+  transition: fill 0.3s;
+}
+.dag-node .node-icon {
+  font-size: 19px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--text-dim);
+  transition: fill 0.3s;
+}
+.dag-node.running rect {
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(59,130,246,0.35));
+}
+.dag-node.running text { fill: var(--accent); }
+.dag-node.running .node-icon { fill: var(--accent); }
+.dag-node.running .pulse-ring {
+  animation: ringPulse 1.5s ease-out infinite;
+}
+.dag-node.complete rect {
+  stroke: var(--green);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(16,185,129,0.3));
+}
+.dag-node.complete text { fill: var(--green); }
+.dag-node.complete .node-icon { fill: var(--green); }
+.dag-node.failed rect {
+  stroke: var(--red);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(239,68,68,0.3));
+}
+.dag-node.failed text { fill: var(--red); }
+.dag-node.failed .node-icon { fill: var(--red); }
+.dag-node.skipped rect {
+  stroke-dasharray: 4 3;
+  opacity: 0.45;
+}
+.dag-node.skipped text { opacity: 0.45; }
+
+@keyframes dashFlow {
+  to { stroke-dashoffset: -15; }
+}
+@keyframes ringPulse {
+  0% { r: 22; opacity: 0.6; }
+  100% { r: 32; opacity: 0; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
+}
+
+/* ---- Event log ---- */
+.event-log {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+
+.event-line {
+  display: flex;
+  gap: 0.75rem;
+}
+.event-time {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.event-phase {
+  font-weight: 600;
+  min-width: 100px;
+}
+.event-phase.analysis { color: var(--purple); }
+.event-phase.env_probe { color: var(--cyan); }
+.event-phase.kb_query { color: var(--amber); }
+.event-phase.web_search { color: var(--accent); }
+.event-phase.preflight { color: var(--green); }
+.event-phase.generation { color: var(--green); }
+.event-phase.error { color: var(--red); }
+.event-phase.init { color: var(--text-dim); }
+.event-msg { color: var(--text); }
+
+/* ---- Code output ---- */
+.code-output {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-input);
+  border-bottom: 1px solid var(--border);
+}
+.code-header span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.code-body {
+  padding: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 500px;
+  overflow-y: auto;
+  color: var(--text);
+}
+
+/* ---- Quick scan ---- */
+.scan-results {
+  margin-top: 1rem;
+}
+.finding-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  border-left: 3px solid var(--red);
+}
+.finding-card.warning { border-left-color: var(--amber); }
+.finding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.finding-rule {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--red);
+}
+.finding-card.warning .finding-rule { color: var(--amber); }
+.finding-line {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.finding-desc {
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+.finding-fix {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--green);
+}
+
+/* ---- KB browser ---- */
+.kb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.75rem;
+}
+.kb-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  transition: border-color 0.2s;
+}
+.kb-card:hover { border-color: var(--accent); }
+.kb-card h4 {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+.kb-card .lib-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--purple-glow);
+  color: var(--purple);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  margin-bottom: 0.5rem;
+}
+.kb-card p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+.kb-card .api-change {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.kb-card .api-change .old { color: var(--red); text-decoration: line-through; }
+.kb-card .api-change .new { color: var(--green); }
+
+/* ---- Example picker ---- */
+.example-picker {
+  margin-bottom: 1rem;
+}
+.example-picker-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.45rem;
+  display: block;
+}
+.example-chips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.example-chip {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-family: var(--sans);
+  color: var(--text-dim);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.example-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.example-chip.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+/* ---- Settings panel ---- */
+.settings-toggle {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  font-family: var(--sans);
+  transition: all 0.2s;
+}
+.settings-toggle:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+.settings-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: none;
+}
+.settings-panel.open { display: block; }
+.settings-panel .input-group { margin-bottom: 0.75rem; }
+.settings-panel .input-group:last-child { margin-bottom: 0; }
+.api-key-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+.api-key-row .input-group { flex: 1; }
+.api-key-status {
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+}
+.api-key-status.set { color: var(--green); }
+.api-key-status.unset { color: var(--amber); }
+
+/* ---- Utils ---- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim);
+}
+.empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text); }
+.hidden { display: none !important; }
+.mt { margin-top: 1rem; }
+.stats-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat-box {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  text-align: center;
+}
+.stat-box .num {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-family: var(--mono);
+}
+.stat-box .label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">EP</div>
+      <div>
+        <h1>EnvPilot</h1>
+        <span>Proactive Code Environment Diagnostics</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <button class="settings-toggle" onclick="toggleSettings()">Settings</button>
+      <div class="health-badge" id="healthBadge" onclick="checkHealth()">checking...</div>
+    </div>
+  </header>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="input-group">
+      <label>LLM Provider</label>
+      <div style="display: flex; align-items: center; gap: 1rem; margin-top: 0.3rem;">
+        <span style="font-size: 0.9rem; color: var(--text-bright); font-weight: 600;">Gemini</span>
+        <span class="api-key-status" id="apiKeyStatus"></span>
+      </div>
+    </div>
+    <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem;">
+      Uses the GEMINI_API_KEY environment variable on the server. Set it before starting: <code style="background: var(--bg-input); padding: 0.15rem 0.4rem; border-radius: 4px;">export GEMINI_API_KEY="your-key"</code>
+    </p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="agent">Agent Workflow</button>
+    <button class="tab" data-tab="scan">Quick Scan</button>
+    <button class="tab" data-tab="kb">Knowledge Base</button>
+  </div>
+
+  <!-- ============ Agent Workflow Tab ============ -->
+  <div class="tab-panel active" id="tab-agent">
+    <div class="input-section">
+      <div class="example-picker">
+        <span class="example-picker-label">Try an example</span>
+        <div class="example-chips" id="agentExamples"></div>
+      </div>
+      <div class="input-group" style="margin-bottom: 1rem;">
+        <label>Task Description</label>
+        <textarea id="taskInput" rows="3" placeholder="e.g. Create a numpy script that computes numerical integration using trapezoid rule"></textarea>
+      </div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>Environment Path (optional)</label>
+          <input type="text" id="envInput" placeholder="e.g. ./environments/case_numpy_2x">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="runBtn" onclick="startRun()">Run EnvPilot</button>
+        <button class="btn btn-secondary" id="clearBtn" onclick="clearRun()">Clear</button>
+      </div>
+    </div>
+
+    <!-- DAG Workflow Visualization -->
+    <div class="dag-container">
+      <svg id="dagSvg" viewBox="0 0 1200 420" width="100%" preserveAspectRatio="xMidYMid meet">
+
+        <defs>
+          <marker id="arrowIdle" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <path d="M0,0 L9,3.5 L0,7" class="dag-arrow" />
+          </marker>
+          <marker id="arrowActive" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <path d="M0,0 L9,3.5 L0,7" class="dag-arrow active" />
+          </marker>
+          <marker id="arrowComplete" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <path d="M0,0 L9,3.5 L0,7" class="dag-arrow complete" />
+          </marker>
+        </defs>
+
+        <!-- Edges -->
+        <g id="dagEdges">
+          <path id="edge-analysis-env"        class="dag-edge" d="M200,135 L260,135" marker-end="url(#arrowIdle)" />
+          <path id="edge-env-kb"              class="dag-edge" d="M410,135 L470,135" marker-end="url(#arrowIdle)" />
+          <path id="edge-kb-preflight"        class="dag-edge" d="M620,135 L800,135" marker-end="url(#arrowIdle)" />
+          <path id="edge-preflight-gen"       class="dag-edge" d="M950,135 L1010,135" marker-end="url(#arrowIdle)" />
+          <path id="edge-kb-web"              class="dag-edge" d="M545,165 L545,252 L502,320" marker-end="url(#arrowIdle)" />
+          <path id="edge-web-kbupdate"        class="dag-edge" d="M575,350 L645,350" marker-end="url(#arrowIdle)" />
+          <path id="edge-kbupdate-preflight"  class="dag-edge" d="M790,350 L875,350 L875,165" marker-end="url(#arrowIdle)" />
+          <path id="edge-preflight-analysis"  class="dag-edge-retry" d="M875,105 C875,25 125,25 125,105" marker-end="url(#arrowIdle)" />
+        </g>
+
+        <!-- Edge labels -->
+        <g id="dagLabels">
+          <text id="label-kb-web"         class="dag-label" x="570" y="245" transform="rotate(-48,570,245)">uncertainty &gt; 20</text>
+          <text id="label-kb-preflight"   class="dag-label" x="710" y="123">confident</text>
+          <text id="label-preflight-gen"  class="dag-label" x="972" y="123">pass</text>
+          <text id="label-retry"          class="dag-label" x="500" y="17">fail / retry</text>
+        </g>
+
+        <!-- Nodes -->
+        <g id="dagNodes">
+          <g id="node-analysis" class="dag-node" data-phase="analysis">
+            <rect x="50" y="105" width="150" height="60" />
+            <circle class="pulse-ring" cx="125" cy="135" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="92" y="132">🔍</text>
+            <text x="148" y="135">Analysis</text>
+          </g>
+          <g id="node-env_probe" class="dag-node" data-phase="env_probe">
+            <rect x="260" y="105" width="150" height="60" />
+            <circle class="pulse-ring" cx="335" cy="135" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="302" y="132">📦</text>
+            <text x="358" y="135">Env Probe</text>
+          </g>
+          <g id="node-kb_query" class="dag-node" data-phase="kb_query">
+            <rect x="470" y="105" width="150" height="60" />
+            <circle class="pulse-ring" cx="545" cy="135" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="512" y="132">📚</text>
+            <text x="568" y="135">KB Query</text>
+          </g>
+          <g id="node-web_search" class="dag-node" data-phase="web_search">
+            <rect x="430" y="320" width="145" height="60" />
+            <circle class="pulse-ring" cx="502" cy="350" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="468" y="347">🌐</text>
+            <text x="528" y="350">Search</text>
+          </g>
+          <g id="node-kb_update" class="dag-node" data-phase="kb_update">
+            <rect x="645" y="320" width="145" height="60" />
+            <circle class="pulse-ring" cx="717" cy="350" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="683" y="347">💾</text>
+            <text x="743" y="350">KB Save</text>
+          </g>
+          <g id="node-preflight" class="dag-node" data-phase="preflight">
+            <rect x="800" y="105" width="150" height="60" />
+            <circle class="pulse-ring" cx="875" cy="135" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="842" y="132">🧪</text>
+            <text x="898" y="135">Preflight</text>
+          </g>
+          <g id="node-generation" class="dag-node" data-phase="generation">
+            <rect x="1010" y="105" width="160" height="60" />
+            <circle class="pulse-ring" cx="1090" cy="135" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0" />
+            <text class="node-icon" x="1055" y="132">✨</text>
+            <text x="1113" y="135">Generation</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Event log -->
+    <div class="event-log hidden" id="eventLog"></div>
+
+    <!-- Code output -->
+    <div class="code-output hidden" id="codeOutput">
+      <div class="code-header">
+        <span>Generated Code</span>
+        <button class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.75rem;" onclick="copyCode()">Copy</button>
+      </div>
+      <div class="code-body" id="codeBody"></div>
+    </div>
+
+    <div class="empty-state" id="agentEmpty">
+      <h3>Ready to go</h3>
+      <p>Describe a coding task above and let EnvPilot handle environment compatibility.</p>
+    </div>
+  </div>
+
+  <!-- ============ Quick Scan Tab ============ -->
+  <div class="tab-panel" id="tab-scan">
+    <div class="input-section">
+      <div class="example-picker">
+        <span class="example-picker-label">Try an example</span>
+        <div class="example-chips" id="scanExamples"></div>
+      </div>
+      <div class="input-group" style="margin-bottom: 1rem;">
+        <label>Python Code to Scan</label>
+        <textarea id="scanCode" rows="8" placeholder="Paste Python code here to scan for breaking API changes..." style="font-family: var(--mono); font-size: 0.82rem;"></textarea>
+      </div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>Environment Path (optional)</label>
+          <input type="text" id="scanEnv" placeholder="e.g. ./environments/case_numpy_2x">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runScan()">Scan Code</button>
+      </div>
+    </div>
+    <div id="scanResults"></div>
+    <div class="empty-state" id="scanEmpty">
+      <h3>Static API Scanner</h3>
+      <p>Paste code above to detect breaking API changes without running it.</p>
+    </div>
+  </div>
+
+  <!-- ============ Knowledge Base Tab ============ -->
+  <div class="tab-panel" id="tab-kb">
+    <div class="stats-row" id="kbStats">
+      <div class="stat-box"><div class="num" id="kbTotal">-</div><div class="label">Total Rules</div></div>
+      <div class="stat-box"><div class="num" id="kbLibs">-</div><div class="label">Libraries</div></div>
+    </div>
+    <div class="input-section" style="padding: 1rem 1.25rem;">
+      <div class="example-picker" style="margin-bottom: 0.75rem;">
+        <span class="example-picker-label">Try a search</span>
+        <div class="example-chips" id="kbExamples"></div>
+      </div>
+      <div class="input-row" style="margin-bottom: 0;">
+        <div class="input-group">
+          <label>Search Knowledge Base</label>
+          <input type="text" id="kbSearch" placeholder="e.g. numpy trapz removed" onkeydown="if(event.key==='Enter')searchKB()">
+        </div>
+        <div style="display: flex; align-items: flex-end;">
+          <button class="btn btn-primary" onclick="searchKB()">Search</button>
+        </div>
+      </div>
+    </div>
+    <div class="kb-grid mt" id="kbGrid"></div>
+  </div>
+
+</div>
+
+<script>
+const API = '';
+
+// ============================================================================
+// Example data
+// ============================================================================
+
+const AGENT_EXAMPLES = [
+  {
+    label: 'NumPy Integration',
+    task: 'Write a Python script that uses numpy to compute the numerical integral of sin(x) from 0 to pi using the trapezoid rule, and print the result.',
+    env: './environments/case_numpy_2x',
+  },
+  {
+    label: 'Pandas Cleaning',
+    task: 'Write a script that creates a pandas DataFrame with some NaN values, fills them using forward-fill via the fillna method parameter, and computes mean absolute deviation per column.',
+    env: './environments/case_pandas_22',
+  },
+  {
+    label: 'SciPy Cumulative',
+    task: 'Write a script that uses scipy to compute the cumulative trapezoidal integral of a sampled signal array.',
+    env: './environments/case_scipy',
+  },
+  {
+    label: 'sklearn Boston',
+    task: 'Load the Boston Housing dataset from sklearn, train a simple linear regression, and print the R-squared score.',
+    env: './environments/case_sklearn',
+  },
+  {
+    label: 'Pydantic Models',
+    task: 'Define a Pydantic User model with name and age fields, create an instance, and serialize it to a dict using model_dump().',
+    env: './environments/case_pydantic',
+  },
+];
+
+const SCAN_EXAMPLES = [
+  {
+    label: 'NumPy 2.0 Breaks',
+    code: `import numpy as np
+
+x = np.linspace(0, np.pi, 100)
+y = np.sin(x)
+
+# Removed in NumPy 2.0
+area = np.trapz(y, x)
+print(f"Integral: {area}")
+
+# Also removed aliases
+print(np.infty)
+arr = np.array([1, 0, 1], dtype=np.bool)`,
+    env: './environments/case_numpy_2x',
+  },
+  {
+    label: 'Pandas 2.2 Breaks',
+    code: `import pandas as pd
+
+df = pd.DataFrame({
+    "A": [1, None, 3, None, 5],
+    "B": [None, 2, None, 4, None],
+})
+
+# method= kwarg removed in pandas 2.2
+df_filled = df.fillna(method="ffill")
+
+# .mad() removed in pandas 2.0
+deviation = df["A"].mad()
+print(deviation)`,
+    env: './environments/case_pandas_22',
+  },
+  {
+    label: 'SciPy 1.14 Breaks',
+    code: `from scipy.integrate import cumtrapz, simps
+import numpy as np
+
+x = np.linspace(0, 2 * np.pi, 100)
+y = np.sin(x)
+
+# cumtrapz removed in SciPy 1.14 -> cumulative_trapezoid
+cumulative = cumtrapz(y, x, initial=0)
+
+# simps removed in SciPy 1.14 -> simpson
+area = simps(y, x)
+print(f"Area: {area}")`,
+    env: './environments/case_scipy',
+  },
+  {
+    label: 'NetworkX 3.0 Breaks',
+    code: `import networkx as nx
+
+G = nx.karate_club_graph()
+
+# write_gpickle removed in NetworkX 3.0
+nx.write_gpickle(G, "graph.gpickle")
+
+# read_gpickle also removed
+H = nx.read_gpickle("graph.gpickle")
+print(f"Nodes: {H.number_of_nodes()}")`,
+    env: './environments/case_networkx',
+  },
+  {
+    label: 'sklearn 1.2 Breaks',
+    code: `from sklearn.datasets import load_boston
+from sklearn.linear_model import LinearRegression
+
+# load_boston removed in sklearn 1.2
+boston = load_boston()
+X, y = boston.data, boston.target
+
+model = LinearRegression().fit(X, y)
+print(f"R2: {model.score(X, y):.4f}")`,
+    env: './environments/case_sklearn',
+  },
+];
+
+const KB_EXAMPLES = [
+  { label: 'numpy trapz',     query: 'numpy trapz' },
+  { label: 'pandas fillna',   query: 'pandas fillna method' },
+  { label: 'scipy removed',   query: 'scipy removed' },
+  { label: 'pydantic v2',     query: 'pydantic model_dump' },
+  { label: 'networkx pickle', query: 'networkx gpickle' },
+  { label: 'sklearn boston',   query: 'sklearn load_boston' },
+];
+
+// ---- Render example chips ----
+function renderExampleChips(containerId, examples, onSelect) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  examples.forEach((ex, i) => {
+    const chip = document.createElement('button');
+    chip.className = 'example-chip';
+    chip.textContent = ex.label;
+    chip.addEventListener('click', () => {
+      container.querySelectorAll('.example-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      onSelect(ex);
+    });
+    container.appendChild(chip);
+  });
+}
+
+renderExampleChips('agentExamples', AGENT_EXAMPLES, (ex) => {
+  document.getElementById('taskInput').value = ex.task;
+  document.getElementById('envInput').value = ex.env || '';
+});
+
+renderExampleChips('scanExamples', SCAN_EXAMPLES, (ex) => {
+  document.getElementById('scanCode').value = ex.code;
+  document.getElementById('scanEnv').value = ex.env || '';
+});
+
+renderExampleChips('kbExamples', KB_EXAMPLES, (ex) => {
+  document.getElementById('kbSearch').value = ex.query;
+  searchKB();
+});
+
+// ---- Tabs ----
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'kb') loadKBStats();
+  });
+});
+
+// ---- Settings ----
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+function updateApiKeyStatus() {
+  const el = document.getElementById('apiKeyStatus');
+  // Check via health endpoint — if server is up, key is available server-side
+  fetch(API + '/api/health').then(r => r.json()).then(d => {
+    el.textContent = 'Key configured on server';
+    el.className = 'api-key-status set';
+  }).catch(() => {
+    el.textContent = 'Server offline — cannot verify';
+    el.className = 'api-key-status unset';
+  });
+}
+updateApiKeyStatus();
+
+// ---- Health ----
+async function checkHealth() {
+  const badge = document.getElementById('healthBadge');
+  try {
+    const r = await fetch(API + '/api/health');
+    const d = await r.json();
+    badge.textContent = `online v${d.version}`;
+    badge.classList.add('online');
+  } catch {
+    badge.textContent = 'offline';
+    badge.classList.remove('online');
+  }
+}
+checkHealth();
+
+// ---- Agent Workflow (DAG) ----
+let currentRunId = null;
+
+const DAG_EDGES = {
+  analysis:   { incoming: ['edge-preflight-analysis'], outgoing: ['edge-analysis-env'] },
+  env_probe:  { incoming: ['edge-analysis-env'],       outgoing: ['edge-env-kb'] },
+  kb_query:   { incoming: ['edge-env-kb'],             outgoing: ['edge-kb-preflight', 'edge-kb-web'] },
+  web_search: { incoming: ['edge-kb-web'],             outgoing: ['edge-web-kbupdate'] },
+  kb_update:  { incoming: ['edge-web-kbupdate'],       outgoing: ['edge-kbupdate-preflight'] },
+  preflight:  { incoming: ['edge-kb-preflight', 'edge-kbupdate-preflight'], outgoing: ['edge-preflight-gen', 'edge-preflight-analysis'] },
+  generation: { incoming: ['edge-preflight-gen'],      outgoing: [] },
+};
+
+const DAG_LABELS = {
+  'edge-kb-web': 'label-kb-web',
+  'edge-kb-preflight': 'label-kb-preflight',
+  'edge-preflight-gen': 'label-preflight-gen',
+  'edge-preflight-analysis': 'label-retry',
+};
+
+const DAG_PHASES = ['analysis', 'env_probe', 'kb_query', 'web_search', 'kb_update', 'preflight', 'generation'];
+
+function resetPipeline() {
+  DAG_PHASES.forEach(p => {
+    const node = document.getElementById('node-' + p);
+    if (node) node.className.baseVal = 'dag-node';
+  });
+  document.querySelectorAll('.dag-edge, .dag-edge-retry').forEach(e => {
+    const base = e.id === 'edge-preflight-analysis' ? 'dag-edge-retry' : 'dag-edge';
+    e.className.baseVal = base;
+    e.setAttribute('marker-end', 'url(#arrowIdle)');
+  });
+  document.querySelectorAll('.dag-label').forEach(l => {
+    l.className.baseVal = 'dag-label';
+  });
+}
+
+function _setEdgeState(edgeId, state) {
+  const edge = document.getElementById(edgeId);
+  if (!edge) return;
+  const base = edgeId === 'edge-preflight-analysis' ? 'dag-edge-retry' : 'dag-edge';
+  edge.className.baseVal = base + (state ? ' ' + state : '');
+  const markerMap = { active: 'arrowActive', complete: 'arrowComplete' };
+  edge.setAttribute('marker-end', 'url(#' + (markerMap[state] || 'arrowIdle') + ')');
+  const labelId = DAG_LABELS[edgeId];
+  if (labelId) {
+    const label = document.getElementById(labelId);
+    if (label) label.className.baseVal = 'dag-label' + (state ? ' ' + state : '');
+  }
+}
+
+function setPhase(phase, status) {
+  const node = document.getElementById('node-' + phase);
+  if (node) {
+    node.className.baseVal = 'dag-node' + (status ? ' ' + status : '');
+  }
+
+  const edges = DAG_EDGES[phase];
+  if (!edges) return;
+
+  if (status === 'running') {
+    edges.incoming.forEach(eid => {
+      const edge = document.getElementById(eid);
+      if (edge && !edge.className.baseVal.includes('complete')) {
+        _setEdgeState(eid, 'active');
+      }
+    });
+  } else if (status === 'complete') {
+    edges.incoming.forEach(eid => _setEdgeState(eid, 'complete'));
+  } else if (status === 'failed') {
+    edges.incoming.forEach(eid => _setEdgeState(eid, 'failed'));
+    if (phase === 'preflight') {
+      _setEdgeState('edge-preflight-analysis', 'active');
+    }
+  }
+}
+
+function addEvent(phase, status, detail) {
+  const log = document.getElementById('eventLog');
+  log.classList.remove('hidden');
+  const now = new Date().toLocaleTimeString('en-US', {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  let msg = status;
+  if (detail) {
+    if (typeof detail === 'object') {
+      const keys = Object.keys(detail);
+      const parts = keys.slice(0, 3).map(k => {
+        const v = detail[k];
+        return `${k}=${Array.isArray(v) ? v.join(',') : v}`;
+      });
+      msg += ' | ' + parts.join(' | ');
+    } else {
+      msg += ' | ' + detail;
+    }
+  }
+  log.innerHTML += `<div class="event-line"><span class="event-time">${now}</span><span class="event-phase ${phase}">${phase}</span><span class="event-msg">${escapeHtml(msg)}</span></div>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function startRun() {
+  const task = document.getElementById('taskInput').value.trim();
+  if (!task) return alert('Please enter a task description.');
+
+  const env = document.getElementById('envInput').value.trim();
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  document.getElementById('agentEmpty').classList.add('hidden');
+  document.getElementById('eventLog').innerHTML = '';
+  document.getElementById('eventLog').classList.remove('hidden');
+  document.getElementById('codeOutput').classList.add('hidden');
+  resetPipeline();
+
+  try {
+    const r = await fetch(API + '/api/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task, env_path: env}),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    currentRunId = d.run_id;
+    listenToStream(d.run_id);
+  } catch(e) {
+    addEvent('error', 'failed', e.message);
+    btn.disabled = false;
+    btn.textContent = 'Run EnvPilot';
+  }
+}
+
+function listenToStream(runId) {
+  const es = new EventSource(API + `/api/run/${runId}/stream`);
+
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    setPhase(data.phase, data.status);
+    addEvent(data.phase, data.status, data.detail);
+  };
+
+  es.addEventListener('complete', (e) => {
+    const data = JSON.parse(e.data);
+    es.close();
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').textContent = 'Run EnvPilot';
+
+    if (data.final_code) {
+      const out = document.getElementById('codeOutput');
+      out.classList.remove('hidden');
+      document.getElementById('codeBody').textContent = data.final_code;
+    }
+    if (data.error) {
+      addEvent('error', 'failed', data.error);
+    }
+  });
+
+  es.onerror = () => {
+    es.close();
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').textContent = 'Run EnvPilot';
+  };
+}
+
+function clearRun() {
+  document.getElementById('taskInput').value = '';
+  document.getElementById('envInput').value = '';
+  document.getElementById('eventLog').innerHTML = '';
+  document.getElementById('eventLog').classList.add('hidden');
+  document.getElementById('codeOutput').classList.add('hidden');
+  document.getElementById('agentEmpty').classList.remove('hidden');
+  resetPipeline();
+}
+
+function copyCode() {
+  const code = document.getElementById('codeBody').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.querySelector('.code-header .btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// ---- Quick Scan ----
+async function runScan() {
+  const code = document.getElementById('scanCode').value.trim();
+  if (!code) return alert('Please paste some Python code.');
+  const env = document.getElementById('scanEnv').value.trim();
+
+  document.getElementById('scanEmpty').classList.add('hidden');
+  document.getElementById('scanResults').innerHTML = '<p style="color:var(--text-dim)">Scanning...</p>';
+
+  try {
+    const r = await fetch(API + '/api/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code, env_path: env}),
+    });
+    const d = await r.json();
+    renderScanResults(d);
+  } catch(e) {
+    document.getElementById('scanResults').innerHTML = `<p style="color:var(--red)">Error: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function renderScanResults(data) {
+  const container = document.getElementById('scanResults');
+  let html = `<div class="stats-row"><div class="stat-box"><div class="num">${data.total_findings}</div><div class="label">Findings</div></div><div class="stat-box"><div class="num">${data.scan_time_ms}ms</div><div class="label">Scan Time</div></div></div>`;
+
+  if (data.findings.length === 0) {
+    html += '<div class="empty-state"><h3>No breaking changes detected</h3><p>The code appears compatible with the target environment.</p></div>';
+  } else {
+    for (const f of data.findings) {
+      const cls = f.severity === 'warning' ? 'finding-card warning' : 'finding-card';
+      html += `<div class="${cls}">
+        <div class="finding-head">
+          <span class="finding-rule">${escapeHtml(f.rule_id)}</span>
+          <span class="finding-line">Line ${f.lineno}</span>
+        </div>
+        <div class="finding-desc">${escapeHtml(f.description)}</div>
+        <div class="finding-fix"><span style="color:var(--red);text-decoration:line-through">${escapeHtml(f.old_api)}</span> &rarr; <span>${escapeHtml(f.new_api)}</span></div>
+        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:0.3rem">${escapeHtml(f.library)} ${escapeHtml(f.installed_version)}</div>
+      </div>`;
+    }
+  }
+  container.innerHTML = html;
+}
+
+// ---- Knowledge Base ----
+async function loadKBStats() {
+  try {
+    const r = await fetch(API + '/api/kb/stats');
+    const d = await r.json();
+    document.getElementById('kbTotal').textContent = d.total_rules;
+    document.getElementById('kbLibs').textContent = d.library_count;
+    // Load all rules
+    const r2 = await fetch(API + '/api/kb/rules');
+    const d2 = await r2.json();
+    renderKBRules(d2.results);
+  } catch(e) {
+    console.error('KB stats error:', e);
+  }
+}
+
+async function searchKB() {
+  const q = document.getElementById('kbSearch').value.trim();
+  if (!q) return loadKBStats();
+  try {
+    const r = await fetch(API + '/api/kb/search?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    renderKBRules(d.results);
+  } catch(e) {
+    console.error('KB search error:', e);
+  }
+}
+
+function renderKBRules(rules) {
+  const grid = document.getElementById('kbGrid');
+  if (rules.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><h3>No rules found</h3></div>';
+    return;
+  }
+  grid.innerHTML = rules.map(r => `
+    <div class="kb-card">
+      <span class="lib-badge">${escapeHtml(r.library)}</span>
+      <h4>${escapeHtml(r.rule_id)}</h4>
+      <p>${escapeHtml(r.description)}</p>
+      <div class="api-change">
+        <div class="old">${escapeHtml(r.old_api)}</div>
+        <div class="new">${escapeHtml(r.new_api)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>

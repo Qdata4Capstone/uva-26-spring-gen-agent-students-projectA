@@ -1,168 +1,144 @@
-# EnvCheck: AI-Powered Pre-Flight Environment Diagnostic
+# EnvPilot: Proactive Code Environment Diagnostic Tool
 
----
+EnvPilot is a proactive code environment diagnostic tool built with Python. It uses AST static analysis and a version-aware breaking-change knowledge base to catch API compatibility issues before generated code is executed.
 
-## Introduction
+The latest version includes pre-execution API compatibility checking for LLM-generated code, breaking-change detection across major libraries, isolated per-case environment testing via `uv`, LLM-integrated workflow comparison for Claude and Gemini, automated Markdown and JSON scan reporting, a LangGraph-based agent workflow, a FastMCP server, a FastAPI web UI, benchmark/evaluation tooling, and a Cursor IDE diagnostic command (`/envcheck.diagnose`).
 
-LLMs generate Python code based on training data that may be months or years old. As libraries evolve — functions get renamed, removed, or have their parameter signatures changed — the generated code "looks correct" but crashes at runtime. For example, asking an LLM to compute a trapezoidal integral with NumPy will very likely produce `np.trapz(y, x)`, a function **removed in NumPy 2.0**.
+Team members: Yusen Wu, Tingfeng Lan, Yi Deng
 
-Existing tools (`pip check`, `mypy`, `ruff`, `pytest`) do not catch this class of error because they don't perform version-aware API compatibility analysis.
+## What EnvPilot Does
 
-**EnvCheck** fills this gap: it performs **static analysis without executing code**, checking the actual installed library versions in a target environment against a curated knowledge base of known API breaking changes. It detects all compatibility issues in a single pass — before the code ever runs.
+LLMs often generate Python code that is syntactically valid but incompatible with the exact package versions installed in a target environment. EnvPilot addresses this gap by checking code against known package-level breaking changes before runtime.
 
----
+Core capabilities:
 
-## Overall Function
+- Parses Python code with the built-in `ast` module without executing user code.
+- Detects imports, aliases, attribute calls, method calls, and keyword-argument usage.
+- Reads installed package versions from the active interpreter or an isolated virtual environment.
+- Matches code against a curated breaking-change knowledge base.
+- Reports all findings in one scan so LLM repair can happen in a single informed turn.
+- Supports NumPy, SciPy, pandas, scikit-learn, NetworkX, Pydantic, and benchmark coverage for additional libraries such as seaborn, Pillow, matplotlib, and Flask.
 
-EnvCheck runs a head-to-head comparison of two LLM-assisted coding workflows:
+## Latest Features
 
-- **Scenario A (without EnvCheck):** LLM generates code → run → crash → send error to LLM → fix → run → crash again → ... Each crash only exposes one error, creating a multi-turn fix loop.
-- **Scenario B (with EnvCheck):** LLM generates code → EnvCheck scans (no execution) → send all diagnostics to LLM → single precise fix → run successfully.
+- **Agent workflow**: A LangGraph pipeline for analysis, environment probing, knowledge-base lookup, optional web search, deterministic preflight verification, planning, and final code generation.
+- **Preflight API verification**: Proposed APIs are tested in the target environment before full code generation.
+- **MCP integration**: `envpilot-mcp` exposes environment probing, knowledge-base query/update, web search, and preflight testing tools.
+- **Web UI**: FastAPI backend with a single-page frontend for quick scans, knowledge-base search, and streamed EnvPilot runs.
+- **Benchmark suite**: 24 verified compatibility cases with baseline vs. EnvPilot evaluation, token/call instrumentation, cached `uv` environments, and summary metrics.
+- **Cursor command**: `.cursor/commands/envcheck.diagnose.md` defines a read-only diagnostic workflow for IDE use.
 
-For a file with N compatibility issues, Scenario A needs at least N+1 LLM API calls. Scenario B always needs exactly 2 calls, regardless of N.
+## Repository Structure
 
-**Measured results across 7 test cases (Gemini 2.5-flash):**
-
-| Metric | Without EnvCheck | With EnvCheck | Improvement |
-|---|---|---|---|
-| LLM API Calls | 16 | 12 | 25% fewer |
-| Total Tokens | 8,382 | 5,758 | 31% reduction |
-| Runtime Crashes | 10 | 0 | 100% eliminated |
-
-**Knowledge base covers:** NumPy 2.0, SciPy 1.14, scikit-learn 1.2, pandas 2.0/2.2, NetworkX 3.0, Pydantic V1/V2 — 20+ rules.
-
----
-
-## Code Structure
-
+```text
+team-12-envcheck/
+├── envcheck/
+│   ├── parser.py                    # AST parser for imports and API usage
+│   ├── version_detector.py          # Installed package/version detection
+│   ├── knowledge_base.py            # Curated breaking-change rules
+│   ├── knowledge_base_store.py      # Searchable KB store used by agent/MCP/web
+│   ├── scanner.py                   # Static compatibility scanner
+│   ├── preflight_runner.py          # Isolated smoke-test execution
+│   ├── mcp_server.py                # FastMCP tools
+│   ├── web_app.py                   # FastAPI application
+│   ├── static/index.html            # Web UI
+│   └── agent/
+│       ├── graph.py                 # LangGraph workflow topology
+│       ├── nodes.py                 # Agent node implementations and metrics
+│       ├── prompts.py               # LLM prompts
+│       └── state.py                 # Agent state schema
+├── benchmark/                       # Verified benchmark cases and eval runner
+├── docs/                            # Demo walkthrough and command explanation
+├── test_cases/                      # Original demo cases
+├── envpilot.py                      # EnvPilot CLI
+├── demo.py                          # Non-LLM workflow demo
+├── demo_llm.py                      # Claude/Gemini workflow comparison demo
+├── main.py                          # Scanner demo/eval entry point
+├── pyproject.toml
+└── uv.lock
 ```
-team-envcheck/
-├── envcheck/                        # Core scanner engine (4-module pipeline)
-│   ├── __init__.py
-│   ├── parser.py                    # AST-based source code parser
-│   │                                # Extracts: imports, alias map, attribute accesses,
-│   │                                # method calls + kwargs — using Python's built-in ast module
-│   ├── version_detector.py          # Reads exact installed package versions from a uv venv
-│   │                                # Runs pip list --format=json in the target environment
-│   ├── knowledge_base.py            # 20+ BreakingChangeRule entries
-│   │                                # 4 pattern types: ATTRIBUTE, IMPORT, METHOD_CALL, METHOD_ACCESS
-│   └── scanner.py                   # Matching engine — ties parser + versions + KB together
-│                                    # Produces ScanReport with Finding list (file, line, fix)
-├── test_cases/
-│   └── cases.py                     # 7 test case definitions (prompt, broken code, fixed code)
-│                                    # Cases: numpy_2x, scipy_114, sklearn_12, pandas_22,
-│                                    #        networkx_3x, pandas_15, pydantic_v1
-├── environments/                    # Per-case isolated uv virtual environments (gitignored)
-├── reports/                         # Generated comparison reports (gitignored)
-├── main.py                          # Test runner and --eval metrics mode
-├── demo.py                          # Workflow comparison demo (no LLM API needed)
-├── demo_llm.py                      # Full LLM demo (Claude or Gemini) — primary script
-├── docs/
-│   ├── demo-walkthrough.md          # Detailed presentation guide with step-by-step traces
-│   └── envcheck-command-explanation.md  # Explanation of the CLI interface
-├── pyproject.toml                   # Project metadata (requires Python ≥ 3.12)
-└── uv.lock                          # Locked dependency versions
-```
-
-**Scanner pipeline:**
-```
-Source Code → parser.py → version_detector.py → knowledge_base.py → scanner.py → ScanReport
-              (AST parse)  (read installed vers)  (breaking change KB)  (4 matchers)
-```
-
----
 
 ## Installation
 
-**Requirements:** Python 3.12+, `uv`
+Requirements:
+
+- Python 3.12+
+- `uv`
 
 ```bash
-cd team-envcheck
-uv sync    # installs anthropic>=0.83.0 and google-genai>=1.64.0
+cd team-12-envcheck
+uv sync
 ```
 
-Set API keys (only needed for LLM demo modes):
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."    # for Claude provider
-export GEMINI_API_KEY="AIza..."          # for Gemini provider
-```
-
----
-
-## How to Run
-
-### Interactive LLM demo (primary script)
-
-Runs a head-to-head comparison using a real LLM API:
+LLM-backed modes require one of these environment variables:
 
 ```bash
-# Single case — interactive (press Enter to advance each step)
-uv run python demo_llm.py --provider gemini --case pandas_22
-
-# Single case — auto-advance (2s delays, good for recorded demos)
-uv run python demo_llm.py --provider gemini --case pandas_22 --auto
-
-# All 7 cases — saves Markdown + JSON report
-uv run python demo_llm.py --provider gemini --all --report
-
-# Mock mode — no API key needed, simulates realistic multi-turn behavior
-uv run python demo_llm.py --mock --case pandas_22
-uv run python demo_llm.py --all --mock --report
-
-# List available cases
-uv run python demo_llm.py --list
+export GEMINI_API_KEY="..."
+export GOOGLE_API_KEY="..."
+export ANTHROPIC_API_KEY="..."
 ```
 
-**Provider options:**
-```bash
-# Claude (default)
-uv run python demo_llm.py --provider claude --case numpy_2x
+## Usage
 
-# Gemini
-uv run python demo_llm.py --provider gemini --case numpy_2x
-
-# Specific model
-uv run python demo_llm.py --provider gemini --model gemini-2.5-pro --case numpy_2x
-```
-
-### Workflow demo (no LLM API needed)
-
-```bash
-uv run python demo.py
-```
-
-### Test runner and evaluation metrics
+Run the original scanner/demo flow:
 
 ```bash
 uv run python main.py
-uv run python main.py --eval    # outputs metrics CSV
+uv run python demo.py
 ```
 
-### Development
+Run the Claude/Gemini comparison demo:
 
 ```bash
-uv run pytest           # run tests
-uv run ruff check       # lint
-uv run ruff format      # format
+uv run python demo_llm.py --mock --case pandas_22
+uv run python demo_llm.py --all --mock --report
+uv run python demo_llm.py --provider gemini --case numpy_2x
 ```
 
-### Available Test Cases
+Run the EnvPilot agent:
 
-| Case ID | Library | Breaking Change |
-|---|---|---|
-| `numpy_2x` | NumPy ≥ 2.0 | `np.trapz`, `np.infty` removed |
-| `scipy_114` | SciPy ≥ 1.14 | `cumtrapz`, `simps` removed |
-| `sklearn_12` | scikit-learn ≥ 1.2 | `load_boston` removed |
-| `pandas_22` | pandas ≥ 2.2 | `fillna(method=...)` kwarg + `.mad()` removed |
-| `networkx_3x` | NetworkX ≥ 3.0 | `write_gpickle` / `read_gpickle` removed |
-| `pandas_15` | pandas == 1.5.3 | `df.map()` didn't exist until 2.1 |
-| `pydantic_v1` | Pydantic == 1.10 | `.model_dump()` is a V2 API |
+```bash
+uv run python envpilot.py "Create a numpy script that computes trapezoid integration"
+uv run python envpilot.py --env ./environments/case_numpy_2x "Create a pandas script using fillna"
+```
 
----
+Start the web UI:
 
-## References
+```bash
+uv run uvicorn envcheck.web_app:app --reload --port 8000
+```
 
-- **docs/demo-walkthrough.md:** Complete presentation guide with step-by-step traces of Scenario A and B for the `pandas_22` case
-- **docs/envcheck-command-explanation.md:** CLI interface documentation
-- Python `ast` module: used for AST-based parsing without code execution
-- `packaging.version.Version`: used for correct semantic version comparison
+Start the MCP server:
+
+```bash
+uv run envpilot-mcp
+```
+
+Run benchmark verification and evaluation:
+
+```bash
+uv run python benchmark/verify_ground_truth.py --first 5
+uv run python benchmark/run_eval.py --case manual_011
+uv run python benchmark/run_eval.py --mode envpilot
+```
+
+## Reports and Outputs
+
+Generated artifacts are intentionally gitignored:
+
+- `reports/`
+- `benchmark/envs/`
+- `benchmark/verification_report.json`
+- `benchmark/eval_results.json`
+- `benchmark/eval_summary.json`
+- `benchmark/charts/`
+
+The committed benchmark data lives in `benchmark/candidates.json` and contains verified bad-environment cases with canonical failing code, corrected code, tests, package pins, and metadata.
+
+## Development
+
+```bash
+uv run pytest
+uv run ruff check
+uv run ruff format
+```
