@@ -1,7 +1,7 @@
 import os
-os.environ["GRADIO_TEMP_DIR"] = "/usa/mengma/myproject/team-07/src/mydownload/temp"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1" 
-
+import argparse
+import subprocess
+import sys
 import warnings
 from typing import *
 from dotenv import load_dotenv
@@ -10,7 +10,7 @@ from transformers import logging
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 
-from interface import create_demo
+from interface_v2 import create_demo
 from medrax.agent import *
 from medrax.tools import *
 from medrax.utils import *
@@ -92,14 +92,18 @@ def initialize_agent(
 
 
 if __name__ == "__main__":
-    """
-    This is the main entry point for the MedRAX application.
-    It initializes the agent with the selected tools and creates the demo.
-    """
-    print("Starting server...")
+    parser = argparse.ArgumentParser(description="MedRAX server")
+    parser.add_argument(
+        "--ui",
+        choices=["gradio", "chainlit"],
+        default="gradio",
+        help="UI backend to use (default: gradio)",
+    )
+    parser.add_argument("--port", type=int, default=8585)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--share", action="store_true", default=True)
+    args = parser.parse_args()
 
-    # Example: initialize with only specific tools
-    # Here three tools are commented out, you can uncomment them to use them
     selected_tools = [
         "ImageVisualizerTool",
         "DicomProcessorTool",
@@ -110,28 +114,52 @@ if __name__ == "__main__":
         "LlavaMedTool",
         "XRayPhraseGroundingTool",
         "GradCAMExplainerTool",
-        # "ChestXRayGeneratorTool",
     ]
 
-    # Collect the ENV variables
     openai_kwargs = {}
     if api_key := os.getenv("OPENAI_API_KEY"):
         openai_kwargs["api_key"] = api_key
-
     if base_url := os.getenv("OPENAI_BASE_URL"):
         openai_kwargs["base_url"] = base_url
 
-    agent, tools_dict = initialize_agent(
-        "/usa/mengma/myproject/team-07/src/medrax/docs/system_prompts.txt", 
-        tools_to_use=selected_tools,
-        model_dir="/usa/mengma/myproject/team-07/src/mydownload",  # Change this to the path of the model weights
-        temp_dir="/usa/mengma/myproject/team-07/src/mydownload/temp",  # Change this to the path of the temporary directory
-        device="cuda",  # Change this to the device you want to use
-        model="gpt-5.2",  # Change this to the model you want to use, e.g. gpt-4o-mini
-        temperature=0.7,
-        top_p=0.95,
-        openai_kwargs=openai_kwargs
-    )
-    demo = create_demo(agent, tools_dict)
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    default_model_dir = os.environ.get("MODEL_DIR", os.path.join(src_dir, "mydownload"))
+    default_temp_dir  = os.environ.get("TEMP_DIR",  os.path.join(default_model_dir, "temp"))
+    default_prompt    = os.environ.get("PROMPT_FILE",
+                                       os.path.join(src_dir, "medrax", "docs", "system_prompts.txt"))
+    default_model     = os.environ.get("OPENAI_MODEL", "gpt-4o")
+    default_device    = os.environ.get("DEVICE", "cuda")
 
-    demo.launch(server_name="0.0.0.0", server_port=8585, share=True)
+    os.environ.setdefault("GRADIO_TEMP_DIR", default_temp_dir)
+
+    if args.ui == "chainlit":
+        # Chainlit manages its own agent initialization via @cl.on_app_startup.
+        # Pass configuration through environment variables and launch in-process.
+        os.environ["MODEL_DIR"]   = default_model_dir
+        os.environ["TEMP_DIR"]    = default_temp_dir
+        os.environ["PROMPT_FILE"] = default_prompt
+        os.environ["OPENAI_MODEL"] = default_model
+        os.environ["DEVICE"]      = default_device
+
+        print(f"Starting Chainlit UI on http://{args.host}:{args.port} ...")
+        subprocess.run([
+            sys.executable, "-m", "chainlit", "run",
+            os.path.join(src_dir, "interface_v3.py"),
+            "--host", args.host,
+            "--port", str(args.port),
+        ])
+    else:
+        print("Starting Gradio server...")
+        agent, tools_dict = initialize_agent(
+            default_prompt,
+            tools_to_use=selected_tools,
+            model_dir=default_model_dir,
+            temp_dir=default_temp_dir,
+            device=default_device,
+            model=default_model,
+            temperature=0.7,
+            top_p=0.95,
+            openai_kwargs=openai_kwargs,
+        )
+        demo = create_demo(agent, tools_dict)
+        demo.launch(server_name=args.host, server_port=args.port, share=args.share)
