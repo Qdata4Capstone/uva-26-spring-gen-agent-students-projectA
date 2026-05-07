@@ -1,3 +1,31 @@
+============================================================================================
+PROJECT B REVIEW — team-07-both and team-12-envcheck-both (reviewed against commit 1df9809)
+============================================================================================
+
+  ┌──────────────────────────────────────┬──────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │                 Team                 │                     File                     │                                         Key Focus Areas                                             │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-07-both (MedRAX + Clinical Eval)│ team-07-both/IMPROVE.md                      │ Remove hardcoded GRADIO_TEMP_DIR path, fix transformers monkey-patch, fix duplicate gradio dep,     │
+  │                                      │                                              │ implement GradCAM async, zero tests, no startup validation, inference timeouts missing,             │
+  │                                      │                                              │ eval JSON parse swallows failures, Gradio share=True default, ImageVisualizerTool disabled          │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ team-12-envcheck-both (EnvPilot)     │ team-12-envcheck-both/IMPROVE.md             │ Exit code always 0 blocks CI/CD, KB still only ~20 rules (was planned to reach 100+), zero unit   │
+  │                                      │                                              │ tests, web app no auth/input-size limit, parser alias tracking incomplete, version detection       │
+  │                                      │                                              │ silent failures, agent nodes swallow all exceptions, pre-commit hook not yet added                 │
+  └──────────────────────────────────────┴──────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  New additions since 1df9809:
+  • team-07-both:  eval_clinical_v2/v3 (3-pass self-reflection), eval_unknown, analyze_results,
+                   Chainlit UI (interface_v3.py), multi-model benchmark scripts (Qwen3-VL, LLaVA-Med,
+                   CheXagent), annotate_tools.py, batch bash experiment runners
+  • team-12-envcheck-both:  full LangGraph 5-phase agent (agent/), FastAPI web UI with SSE streaming,
+                   FastMCP server (4 tools), web_searcher, knowledge_base_store (SQLite FTS),
+                   preflight_runner, envpilot.py CLI, BigCodeBench benchmark suite (benchmark/)
+
+============================================================================================
+ORIGINAL SUMMARY — All improvement plan files (created earlier)
+============================================================================================
+
 ⏺ All improvement plan files have been created. Here's a summary of what was written:
 
 PROJECT A — IMPROVEMENT_PLAN.md files (8 teams)
