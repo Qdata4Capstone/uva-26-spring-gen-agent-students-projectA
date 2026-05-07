@@ -1,5 +1,16 @@
 # Virtual environments (per-case isolated envs)
 environments/
+benchmark/envs/
+benchmark/verification_report.json
+benchmark/eval_results.json
+benchmark/eval_summary.json
+benchmark/eval_full_*.log
+benchmark/charts/
+
+# Local secrets — never commit
+.env
+.env.local
+.env.*.local
 
 # Generated test scripts (created at runtime)
 test_cases/generated/

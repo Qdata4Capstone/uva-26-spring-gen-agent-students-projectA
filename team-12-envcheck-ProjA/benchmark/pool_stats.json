@@ -1,0 +1,21 @@
+{
+  "raw_dataset_size": 1140,
+  "filtered_pool_size": 752,
+  "sampled_size": 50,
+  "lib_distribution": {
+    "numpy": 334,
+    "pandas": 427,
+    "sklearn": 152,
+    "scipy": 85,
+    "matplotlib": 309,
+    "pydantic": 0,
+    "pillow": 6,
+    "flask": 6,
+    "requests": 40,
+    "seaborn": 72,
+    "sqlalchemy": 0,
+    "bs4": 14
+  },
+  "dataset_split": "v0.1.4",
+  "random_seed": 42
+}

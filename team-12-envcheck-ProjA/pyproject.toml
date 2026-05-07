@@ -1,12 +1,20 @@
 [project]
 name = "envcheck"
-version = "0.1.0"
-description = "AI-powered pre-flight diagnostic for code environment compatibility — detects API breaking changes, dependency conflicts, and version mismatches before runtime."
+version = "0.2.0"
+description = "EnvPilot: AI-powered pre-flight diagnostic for code environment compatibility — detects API breaking changes, dependency conflicts, and version mismatches before runtime."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.83.0",
     "google-genai>=1.64.0",
+    "fastmcp>=2.0.0",
+    "duckduckgo-search>=7.0.0",
+    "langgraph>=0.4.0",
+    "langchain-google-genai>=4.0.0",
+    "langchain-core>=0.3.0",
+    "packaging>=24.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
 ]
 
 [dependency-groups]
@@ -14,3 +22,6 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.4.0",
 ]
+
+[project.scripts]
+envpilot-mcp = "envcheck.mcp_server:main"
